@@ -70,6 +70,7 @@
         "constr_sequence.h": "c",
         "longitudinalaccelerationvalue.h": "c",
         "nativeenumerated.h": "c",
-        "headingconfidence.h": "c"
+        "headingconfidence.h": "c",
+        "optional": "cpp"
     }
 }

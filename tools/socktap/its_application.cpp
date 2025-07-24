@@ -432,10 +432,22 @@ void ITSApplication::on_timer(Clock::time_point)
     cam.camParameters.highFrequencyContainer.present = HighFrequencyContainer_PR_basicVehicleContainerHighFrequency;
 
     BasicVehicleContainerHighFrequency& bvc = cam.camParameters.highFrequencyContainer.choice.basicVehicleContainerHighFrequency;
-    bvc.heading.headingValue = position.course.value().value();
-    bvc.heading.headingConfidence = HeadingConfidence_equalOrWithinOneDegree;
+    if( position.course.value().value() == position.course.value().value() )
+    {
+        bvc.heading.headingValue = position.course.value().value();
+    }else{
+         bvc.heading.headingValue = 0;
+    }
 
-    bvc.speed.speedValue = position.speed.value().value();
+    bvc.heading.headingConfidence = HeadingConfidence_equalOrWithinOneDegree;
+    if(position.speed.value().value() == position.speed.value().value()){
+        bvc.speed.speedValue = position.speed.value().value();
+    }
+    else{
+        bvc.speed.speedValue = 0;
+    }
+
+
     bvc.speed.speedConfidence = SpeedConfidence_equalOrWithinOneCentimeterPerSec;
 
     bvc.longitudinalAcceleration.longitudinalAccelerationValue = 0;
