@@ -671,7 +671,7 @@ void ITSApplication::sendDenm(const json& j){
 
 void ITSApplication::setMultihop(const std::string& type) 
 {
-	std::cout << "multihop type:" << type << std::endl;
+			std::cout << "multihop type:" << type << std::endl;
 
 	if (type == "off") {
 		this->multihopType = MultihopType::off;
