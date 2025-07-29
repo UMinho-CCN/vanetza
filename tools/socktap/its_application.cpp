@@ -785,7 +785,7 @@ void ITSApplication::sendCPM(const json& j){
     vanetza::asn1::Cpm cpmmessage;
     ItsPduHeader_t& header = cpmmessage->header;
     header.protocolVersion = 2;
-    header.messageID = 14; //header for cpm and to see on wireshark
+    header.messageID = 14; //header for cpm 
     header.stationID = this->station_id;
 
     CollectivePerceptionMessage_t& cpm = cpmmessage->cpm;
@@ -799,24 +799,19 @@ void ITSApplication::sendCPM(const json& j){
     CpmManagementContainer_t& management = cpmparams.managementContainer;
     management.stationType = StationType_passengerCar;
 
-    //station position
+    //get station position
     auto position = positioning_.position_fix();
-    //.value() returns in meters so i cast to microdeg as it is what is used in the messages
+    //convert .value() cast to microdegrees
     
     double latitude_deg = position.latitude.value();
     int32_t latitude_microdeg = static_cast<int32_t>(latitude_deg * 1e7);
-    //std::cout << "Latitude (microdegrees): " << latitude_microdeg << std::endl;
     
     double longitude_deg = position.longitude.value();
     int32_t longitude_microdeg = static_cast<int32_t>(longitude_deg * 1e7);
-    //std::cout << "Longitude (microdegrees): " << longitude_microdeg << std::endl;
-
+   
     //fill reference position with station position
     management.referencePosition.latitude = latitude_microdeg;
     management.referencePosition.longitude = longitude_microdeg;
-    //management.referencePosition.positionConfidenceEllipse.semiMajorOrientation=0;
-    //management.referencePosition.altitude.altitudeValue=0;
-
 
     //perceivedObjectContainer
     cpmparams.perceivedObjectContainer=vanetza::asn1::allocate<PerceivedObjectContainer_t>();
@@ -842,10 +837,8 @@ void ITSApplication::sendCPM(const json& j){
         objectID++;
 
         //TimeOfMeasurement 1 -> 1ms
-        
         asn_obj->timeOfMeasurement =0; 
        
-
         //yDistance 1 -> 0.01m
         //object latitude position to calculte yDistance
         ReferencePosition_t& Object_latitude = *vanetza::asn1::allocate<ReferencePosition_t>();
@@ -853,7 +846,7 @@ void ITSApplication::sendCPM(const json& j){
         Object_latitude.longitude = 0;  
         //calculate latitude diference in meters
         units::Length d = distance(Station_latitude,Object_latitude);
-        // std::cout << "yDistance = " << d.value() << " meters" << std::endl;
+        //verify distance if exceeds limits set as max values
         if(d.value() > 132.767 ){
             asn_obj->yDistance.value = 132767;
         }else if ( d.value() < -132678){
@@ -871,8 +864,8 @@ void ITSApplication::sendCPM(const json& j){
         Object_longitude.longitude = obj.value("lon", 0);  
         //calculate longitude diference in meters
         units::Length dlon = distance(Station_longitude, Object_longitude);
-        std::cout << "Distance long= " << dlon.value() << " meters" << std::endl;
-          if(dlon.value() > 132.767 ){
+        //verify distance if exceeds limits set as max values
+        if(dlon.value() > 132.767 ){
             asn_obj->xDistance.value = 132767;
         }else if ( dlon.value() < -132.678){
             asn_obj->xDistance.value = -132768;
@@ -950,8 +943,6 @@ void ITSApplication::sendCPM(const json& j){
     request.its_aid = aid::CP;
     request.transport_type = geonet::TransportType::SHB;
     request.communication_profile = geonet::CommunicationProfile::ITS_G5;
- 
-    //print_indented_denm(std::cout, message, "  ", 1);
     
     try {
     auto confirm = Application::request(request, std::move(packet));
