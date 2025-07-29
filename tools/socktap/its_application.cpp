@@ -867,7 +867,7 @@ void ITSApplication::sendCPM(const json& j){
         //verify distance if exceeds limits set as max values
         if(dlon.value() > 132.767 ){
             asn_obj->xDistance.value = 132767;
-        }else if ( dlon.value() < -132.678){
+        }else if ( dlon.value() < -132.768){
             asn_obj->xDistance.value = -132768;
         }else{
             asn_obj->xDistance.value = dlon.value()*100;
