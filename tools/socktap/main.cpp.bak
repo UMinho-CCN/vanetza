@@ -183,7 +183,9 @@ int main(int argc, const char** argv)
                 its->print_received_message(vm.count("print-rx-cam") > 0);
                 its->print_generated_message(vm.count("print-tx-cam") > 0);
 				
-				its->setMultihop(vm["multihop"].as<std::string>());
+				
+				std::string multihop_mode = vm["multihop"].as<std::string>();
+
 				
                 its->setStationID(vm["station-id"].as<unsigned>());
                 if(vm.count("send-to-server") > 0){
