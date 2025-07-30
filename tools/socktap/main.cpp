@@ -47,7 +47,6 @@ int main(int argc, const char** argv)
         ("station-id", po::value<unsigned>()->default_value(1), "Station ID")
         ("applications,a", po::value<std::vector<std::string>>()->default_value({"ca"}, "ca")->multitoken(), "Run applications [ca,its,hello,benchmark]")
         ("non-strict", "Set MIB parameter ItsGnSnDecapResultHandling to NON_STRICT")
-		("multihop", po::value<std::string>()->default_value("off"), "Multihop mode: off, geo, flood, prob");
     ;
     add_positioning_options(options);
     add_security_options(options);
@@ -176,28 +175,25 @@ int main(int argc, const char** argv)
             } 
             else if (app_name == "its") {
                 
-               std::unique_ptr<ITSApplication> its {
+               std::unique_ptr<ITSApplication> ca {
                     new ITSApplication(*positioning, trigger.runtime(), io_service, 9001)
                 };
-                its->set_interval(std::chrono::milliseconds(vm["cam-interval"].as<unsigned>()));
-                its->print_received_message(vm.count("print-rx-cam") > 0);
-                its->print_generated_message(vm.count("print-tx-cam") > 0);
-				
-				its->setMultihop(vm["multihop"].as<std::string>());
-				
-                its->setStationID(vm["station-id"].as<unsigned>());
+                ca->set_interval(std::chrono::milliseconds(vm["cam-interval"].as<unsigned>()));
+                ca->print_received_message(vm.count("print-rx-cam") > 0);
+                ca->print_generated_message(vm.count("print-tx-cam") > 0);
+                ca->setStationID(vm["station-id"].as<unsigned>());
                 if(vm.count("send-to-server") > 0){
-                    its->setServerIP(vm["server-ip"].as<std::string>().data());
-                    its->setServerPort(vm["server-port"].as<unsigned>());
+                    ca->setServerIP(vm["server-ip"].as<std::string>().data());
+                    ca->setServerPort(vm["server-port"].as<unsigned>());
                     
-                    its->createSocket();
-                    its->setSendToServer(true);
+                    ca->createSocket();
+                    ca->setSendToServer(true);
                 }
                 if(vm.count("send-to-file") > 0){
                     context.setSendToFile(true);
                     context.setFile(vm["file"].as<std::string>().data());
                 }
-                apps.emplace(app_name, std::move(its));
+                apps.emplace(app_name, std::move(ca));
             } else if (app_name == "hello") {
                 std::unique_ptr<HelloApplication> hello {
                     new HelloApplication(io_service, std::chrono::milliseconds(800))

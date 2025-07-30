@@ -16,14 +16,12 @@
 #include <boost/units/io.hpp>
 
 #include "nlohmann/json.hpp"
-
 // This is a very simple CA application sending CAMs at a fixed rate.
 
 using namespace vanetza;
 using namespace vanetza::facilities;
 using namespace std::chrono;
 namespace asio = boost::asio;
-
 
 ITSApplication::ITSApplication(PositionProvider& positioning, Runtime& rt, asio::io_service& io_service, unsigned short denm_port) :
     positioning_(positioning), runtime_(rt), cam_interval_(seconds(1)),
@@ -526,22 +524,6 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             std::cout << "Received DENM contains\n";
             print_indentedDENM(std::cout, *denm, "  ", 1);
         }
-		
-		switch (getMultihop()) 
-		{
-			case MultihopType::off:
-				// não fazer forwarding
-				std::cout << "Multihop Off - Not Forwarding\n";
-				break;
-			case MultihopType::flood:
-				// flooding
-				std::cout << "Multihop - Flooding\n";
-				break;
-			case MultihopType::prob:
-				// forwarding probabilístico
-				std::cout << "Multihop - Prob\n";
-				break;
-		}
     }    
     else if (cpm) {
         
@@ -789,49 +771,16 @@ void ITSApplication::sendDenm(const json& j){
     packet->layer(OsiLayer::Application) = std::move(message);
     DataRequest request;
     request.its_aid = aid::DEN;
-	
-	if (this->multihopType == MultihopType::geo) 
-	{
-		std::cout << "Sending DEMN using GeoBroadcasting" << std::endl;
-		// ... código específico para geo
-	}
-	else
-	{
-		std::cout << "Sending DEMN using Single Hop Broacasting" << std::endl;
-		request.transport_type = geonet::TransportType::SHB;
-	}
-	
-	request.communication_profile = geonet::CommunicationProfile::ITS_G5;
+    request.transport_type = geonet::TransportType::SHB;
+    request.communication_profile = geonet::CommunicationProfile::ITS_G5;
     auto confirm = Application::request(request, std::move(packet));
     if (!confirm.accepted()) {
         throw std::runtime_error("DENM application data request failed");
     }
 
-	
+
 }
 
-void ITSApplication::setMultihop(const std::string& type) 
-{
-	std::cout << "multihop type:" << type << std::endl;
-
-	if (type == "off") {
-		this->multihopType = MultihopType::off;
-	} else if (type == "geo") {
-		this->multihopType = MultihopType::geo;
-	} else if (type == "flood") {
-		this->multihopType = MultihopType::flood;
-	} else if (type == "prob") {
-		this->multihopType = MultihopType::prob;
-	} else {
-		std::cerr << "Invalid multihop mode - turning off " << type << std::endl;
-		this->multihopType = MultihopType::off;
-	}
-}
-
-MultihopType ITSApplication::getMultihop() 
-{
-	return multihopType;
-}
 void ITSApplication::sendCPM(const json& j){
     vanetza::asn1::Cpm cpmmessage;
     ItsPduHeader_t& header = cpmmessage->header;

@@ -14,7 +14,6 @@
 #include <netinet/in.h> 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio.hpp>
-#include <string>
 
 #include "nlohmann/json.hpp"
 using json = nlohmann::json;
@@ -24,13 +23,6 @@ struct Denm_Data{
     int type;
     int lat;
     int lon;
-};
-
-enum class MultihopType {
-	off,
-	geo,
-	flood,
-	prob
 };
 
 class ITSApplication : public Application
@@ -47,8 +39,7 @@ public:
     void setServerPort(int serverPort);
     void setServerIP(const char * serverIP);
     void setStationID(int station_id);
-    void setMultihop(const std::string& type);
-
+    
 
     int createSocket();
 private:
@@ -84,7 +75,7 @@ private:
     asio::ip::udp::socket cam_socket;                    // member socket
     asio::ip::udp::endpoint cam_endpoint;
 
-    std::array<char, 1024> recv_buffer;
+    std::array<char, 2048> recv_buffer;
     
 };
 
