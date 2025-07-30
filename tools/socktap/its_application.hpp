@@ -85,7 +85,10 @@ private:
     asio::ip::udp::endpoint cam_endpoint;
 
     std::array<char, 1024> recv_buffer;
+  
+	MultihopType getMultihop();
     
+	MultihopType multihopType = MultihopType::off; 
 };
 
 #endif /* CAM_APPLICATION_HPP_EUIC2VFR */

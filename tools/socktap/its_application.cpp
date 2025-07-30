@@ -303,13 +303,9 @@ void ITSApplication::handle_receive_error(const std::error_code& error){
 void ITSApplication::handle_message(std::size_t bytes_transferred){
 
     std::string data(this->recv_buffer.data(), bytes_transferred);  // Only use valid part of buffer
-    //std::cout << "[Received UDP data]: " << data << std::endl; 
     try {
         // Parse JSON from received data
         nlohmann::json proto2json = nlohmann::json::parse(data);
-        
-        // print json
-        //std::cout << "[Parsed proto2 received]:\n" << proto2json.dump(4) << std::endl;
         if(!proto2json["objects"].empty()){    
             this->sendCPM(proto2json["objects"]);
         }
@@ -767,14 +763,14 @@ void ITSApplication::sendDenm(const json& j){
     } else if (eventTypeStr == "roadwork") {
         causeCode = 12;
     }
-// add other mappings as needed
+    // add other mappings as needed
 
     situation->eventType.causeCode = causeCode;
     situation->eventType.subCauseCode = 0;
     message->denm.situation = situation;
      //print generated DENM
-    std::cout << "Generated DENM contains\n";
-    asn_fprint(stdout, &asn_DEF_DENM,message.operator->());
+    //std::cout << "Generated DENM contains\n";
+    //asn_fprint(stdout, &asn_DEF_DENM,message.operator->());
         
     std::string error;
 	if (!message.validate(error)) {
@@ -933,7 +929,7 @@ void ITSApplication::sendCPM(const json& j){
             asn_obj->zDistance->confidence = obj.value("altitudeConfidence", 0);
         }
 
-        // xSpeed - 1 -> 1 cm/s , m/s = cm/s*100
+        // xSpeed - 1 -> 1 cm/s 
         asn_obj->xSpeed.value = obj.value("speed", 0);
         asn_obj->xSpeed.confidence = obj.value("speedConfidence", 0);
 
@@ -945,21 +941,21 @@ void ITSApplication::sendCPM(const json& j){
         // xAccelerarion 1 -> 0.1m/s^2 
         if (obj.contains("longAcc")) {
             asn_obj->xAcceleration = vanetza::asn1::allocate<LongitudinalAcceleration_t>();
-            asn_obj->xAcceleration->longitudinalAccelerationValue = obj.value("longAcc", 0.0);  // m/s² → scaled
+            asn_obj->xAcceleration->longitudinalAccelerationValue = obj.value("longAcc", 0.0);  
             asn_obj->xAcceleration->longitudinalAccelerationConfidence = obj.value("longAccConfidence", 0);
         }
 
         // yawAngle 1 -> 0.1º
         if (obj.contains("heading")) {
             asn_obj->yawAngle = vanetza::asn1::allocate<CartesianAngle_t>();
-            asn_obj->yawAngle->value =  obj.value("heading", 3601);  // degrees → 0.01 deg
+            asn_obj->yawAngle->value =  obj.value("heading", 3601);  
             asn_obj->yawAngle->confidence = obj.value("headingConfidence", 0);
         }
 
         // Length 1 -> 0.1m
         if (obj.contains("length")) {  
             asn_obj->planarObjectDimension1 = vanetza::asn1::allocate<ObjectDimension_t>();
-            asn_obj->planarObjectDimension1->value =obj.value("length", 0.0); // meters → cm
+            asn_obj->planarObjectDimension1->value =obj.value("length", 0.0); 
             asn_obj->planarObjectDimension1->confidence = obj.value("lengthConfidence", 0);
         }
         
@@ -985,8 +981,8 @@ void ITSApplication::sendCPM(const json& j){
     cpmparams.numberOfPerceivedObjects = cpmparams.perceivedObjectContainer->list.count;
 
 
-    std::cout << "Generated Full CPM contains:\n";
-    asn_fprint(stdout, &asn_DEF_CPM, cpmmessage.operator->());
+    //std::cout << "Generated Full CPM contains:\n";
+    //asn_fprint(stdout, &asn_DEF_CPM, cpmmessage.operator->());
 
     DownPacketPtr packet { new DownPacket() };
     packet->layer(OsiLayer::Application) = std::move(cpmmessage);
