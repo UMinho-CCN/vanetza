@@ -47,7 +47,8 @@ public:
     void setServerPort(int serverPort);
     void setServerIP(const char * serverIP);
     void setStationID(int station_id);
-    
+    void setMultihop(const std::string& type);
+
 
     int createSocket();
 private:
@@ -72,6 +73,7 @@ private:
     bool print_tx_msg_ = false;
     bool send_to_server = false;
     
+	
     int server_port;
     const char* serverIP;
 
@@ -87,7 +89,6 @@ private:
 	
 
 	
-	void setMultihop(const std::string& type);
 	MultihopType getMultihop();
     
 	MultihopType multihopType = MultihopType::off; 

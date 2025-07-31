@@ -15,13 +15,14 @@
 #include <boost/asio.hpp>
 #include "nlohmann/json.hpp"
 
+
+
 // This is a very simple CA application sending CAMs at a fixed rate.
 
 using namespace vanetza;
 using namespace vanetza::facilities;
 using namespace std::chrono;
 namespace asio = boost::asio;
-
 
 ITSApplication::ITSApplication(PositionProvider& positioning, Runtime& rt, asio::io_service& io_service, unsigned short denm_port) :
     positioning_(positioning), runtime_(rt), cam_interval_(seconds(1)),
@@ -33,7 +34,7 @@ ITSApplication::ITSApplication(PositionProvider& positioning, Runtime& rt, asio:
     this->server_port = 9000;
     this->serverIP = strdup("192.168.1.100");
     this->start_receive();
-	
+		
 }
 void ITSApplication::sendCAMToServer(const std::string& data, int size) {
     std::cout << "sending to server" << std::endl;
@@ -345,6 +346,7 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
 
     if (cam) {
         std::cout << "Received CAM with decodable content" << std::endl;
+
         if (print_rx_msg_) {
             std::cout << "Received CAM contains\n";
             print_indented(std::cout, *cam, "  ", 1);
@@ -399,6 +401,10 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
 			case MultihopType::prob:
 				// forwarding probabilístico
 				std::cout << "Multihop - Prob\n";
+				break;
+			case MultihopType::geo:
+				// forwarding geo
+				std::cout << "Multihop - Geo\n";
 				break;
 		}
     }    
@@ -510,7 +516,7 @@ void ITSApplication::on_timer(Clock::time_point)
 
 void ITSApplication::sendDenm(const json& j){
 
-   // printf("sending denm: %ld %ld %d\n", denm_data->type, denm_data->lat, denm_data->lon );
+    //printf("sending denm: %ld %ld %d\n", denm_data->type, denm_data->lat, denm_data->lon );
     const auto& proto2event = j["events"];
     int counter  = 1;
     vanetza::asn1::Denm message;
@@ -649,10 +655,25 @@ void ITSApplication::sendDenm(const json& j){
     DataRequest request;
     request.its_aid = aid::DEN;
 	
+	//GeoBroadcast
 	if (this->multihopType == MultihopType::geo) 
 	{
 		std::cout << "Sending DEMN using GeoBroadcasting" << std::endl;
-		// ... código específico para geo
+		request.transport_type = geonet::TransportType::GBC;
+
+		vanetza::geonet::Area area;
+
+		// Usa círculo com raio de 500m
+		using vanetza::units::degree;
+		area.shape = vanetza::geonet::Circle();
+		boost::get<vanetza::geonet::Circle>(area.shape).r = 500.0 * vanetza::units::si::meter;
+
+		// Coordenadas centrais (em graus)
+		area.position.longitude = proto2event.value("lon", 0.0) * degree;
+		area.position.latitude  = proto2event.value("lat", 0.0) * degree;
+
+		// Aplica no request
+		request.destination = area;
 	}
 	else
 	{
