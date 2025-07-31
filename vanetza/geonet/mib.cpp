@@ -39,7 +39,7 @@ ManagementInformationBase::ManagementInformationBase() :
     itsGnMaxGeoAreaSize(10 * kilo * kilo * square_meters),
     itsGnMinPacketRepetitionInterval(100 * milliseconds),
     itsGnNonAreaForwardingAlgorithm(UnicastForwarding::Greedy),
-    itsGnAreaForwardingAlgorithm(BroadcastForwarding::CBF),
+    itsGnAreaForwardingAlgorithm(BroadcastForwarding::SIMPLE),
     itsGnCbfMinTime(1 * milliseconds),
     itsGnCbfMaxTime(100 * milliseconds),
     itsGnDefaultMaxCommunicationRange(1000 * meters),
