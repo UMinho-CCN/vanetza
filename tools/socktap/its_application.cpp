@@ -769,9 +769,10 @@ void ITSApplication::sendDenm(const json& j){
     situation->eventType.subCauseCode = 0;
     message->denm.situation = situation;
      //print generated DENM
-    //std::cout << "Generated DENM contains\n";
-    //asn_fprint(stdout, &asn_DEF_DENM,message.operator->());
-        
+    if (print_tx_msg_) {
+        std::cout << "Generated DENM contains\n";
+        asn_fprint(stdout, &asn_DEF_DENM,message.operator->());
+    }
     std::string error;
 	if (!message.validate(error)) {
 		throw std::runtime_error("Invalid DENM: " + error);
@@ -872,17 +873,24 @@ void ITSApplication::sendCPM(const json& j){
     ReferencePosition_t& Station_longitude = *vanetza::asn1::allocate<ReferencePosition_t>();
     Station_longitude.latitude = 0;   
     Station_longitude.longitude = longitude_microdeg; 
-    int objectID = 0;
+
     for (const auto& obj : j) {
 
         //  PerceivedObject_t* asn_obj = (PerceivedObject_t*)calloc(1, sizeof(PerceivedObject_t));
         auto asn_obj = vanetza::asn1::allocate<PerceivedObject_t>();
         
-        // 1. objectID (convert "obj-001" → 1)
-        
-        asn_obj->objectID = objectID;
-        objectID++;
+        // 1. objectID
+        std::string id_str = obj["objectID"];
+        try {
+            // Try converting to int
+            int id_int = std::stoi(id_str);
+            asn_obj->objectID = id_int;
+        } catch (const std::invalid_argument& e) {
 
+            std::cerr << "Invalid objectID: not a number -> " << id_str << std::endl;
+            asn_obj->objectID = 255;
+        }
+    
         //TimeOfMeasurement 1 -> 1ms
         asn_obj->timeOfMeasurement =0; 
        
@@ -893,10 +901,11 @@ void ITSApplication::sendCPM(const json& j){
         Object_latitude.longitude = 0;  
         //calculate latitude diference in meters
         units::Length d = distance(Station_latitude,Object_latitude);
+        
         //verify distance if exceeds limits set as max values
-        if(d.value() > 132.767 ){
+        if(d.value() > 1327.67 ){    
             asn_obj->yDistance.value = 132767;
-        }else if ( d.value() < -132.678){
+        }else if ( d.value() < -1327.68){     
             asn_obj->yDistance.value = -132768;
         }else{
             asn_obj->yDistance.value = d.value()*100;
@@ -912,9 +921,9 @@ void ITSApplication::sendCPM(const json& j){
         //calculate longitude diference in meters
         units::Length dlon = distance(Station_longitude, Object_longitude);
         //verify distance if exceeds limits set as max values
-        if(dlon.value() > 132.767 ){
+        if(dlon.value() > 1327.67 ){
             asn_obj->xDistance.value = 132767;
-        }else if ( dlon.value() < -132.768){
+        }else if ( dlon.value() < -1327.68){
             asn_obj->xDistance.value = -132768;
         }else{
             asn_obj->xDistance.value = dlon.value()*100;
@@ -980,10 +989,10 @@ void ITSApplication::sendCPM(const json& j){
     //number of perceivedobjects value
     cpmparams.numberOfPerceivedObjects = cpmparams.perceivedObjectContainer->list.count;
 
-
-    //std::cout << "Generated Full CPM contains:\n";
-    //asn_fprint(stdout, &asn_DEF_CPM, cpmmessage.operator->());
-
+    if (print_tx_msg_) {
+        std::cout << "Generated Full CPM contains:\n";
+        asn_fprint(stdout, &asn_DEF_CPM, cpmmessage.operator->());
+    }
     DownPacketPtr packet { new DownPacket() };
     packet->layer(OsiLayer::Application) = std::move(cpmmessage);
     DataRequest request;
