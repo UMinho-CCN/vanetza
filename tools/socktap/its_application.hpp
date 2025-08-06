@@ -58,7 +58,7 @@ private:
     void start_receive();
     void sendCAMToServer(const std::string& data, int size);
     void sendToServer(u_int64_t* dataToSend, int size);
-    void create_CPM(const json& j);
+    void sendCPM(const json& j);
     void sendDenm(const json& j);
     void handle_message(std::size_t bytes_transferred);
     void handle_receive_error(const std::error_code& error);
@@ -85,13 +85,10 @@ private:
     asio::ip::udp::endpoint cam_endpoint;
 
     std::array<char, 1024> recv_buffer;
-	
-
-	
+  
 	MultihopType getMultihop();
     
 	MultihopType multihopType = MultihopType::off; 
-	
 };
 
 #endif /* CAM_APPLICATION_HPP_EUIC2VFR */
