@@ -325,7 +325,6 @@ void print_indentedDENM(std::ostream& os, const asn1::Denm& message, const std::
 }
 }
 
-
 void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr packet)
 {
     printf("Received Message\n\n");
@@ -383,10 +382,15 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
     }
     else if (denm) {
         std::cout << "Received DENM with decodable content" << std::endl;
+				
         if (print_rx_msg_) {  
             std::cout << "Received DENM contains\n";
             print_indentedDENM(std::cout, *denm, "  ", 1);
         }
+		else
+		{
+			std::cout << "Not printing\n";			
+		}
 		
 		switch (getMultihop()) 
 		{
@@ -516,7 +520,7 @@ void ITSApplication::on_timer(Clock::time_point)
 
 void ITSApplication::sendDenm(const json& j){
 
-    printf("sending denm: %ld %ld %d\n", denm_data->type, denm_data->lat, denm_data->lon );
+    //printf("sending denm: %ld %ld %d\n", denm_data->type, denm_data->lat, denm_data->lon );
     const auto& proto2event = j["events"];
     int counter  = 1;
     vanetza::asn1::Denm message;

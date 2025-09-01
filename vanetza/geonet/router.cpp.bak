@@ -1024,9 +1024,6 @@ bool Router::process_extended(const ExtendedPduConstRefs<BeaconHeader>& pdu, con
 
 bool Router::process_extended(const ExtendedPduConstRefs<GeoBroadcastHeader>& pdu, const UpPacket& packet, const LinkLayer& ll)
 {
-	
-	std::cout << "Processing Extended\n" << std::endl;
-
     // GBC forwarder and receiver operations (section 9.3.11.3 in EN 302 636-4-1 V1.2.1)
     const GeoBroadcastHeader& gbc = pdu.extended();
     const Address& source_addr = gbc.source_position.gn_addr;
@@ -1043,22 +1040,17 @@ bool Router::process_extended(const ExtendedPduConstRefs<GeoBroadcastHeader>& pd
         if (m_mib.itsGnNonAreaForwardingAlgorithm == UnicastForwarding::Unspecified ||
             m_mib.itsGnNonAreaForwardingAlgorithm == UnicastForwarding::Greedy) {
             duplicate_packet = detect_duplicate_packet(source_addr, gbc.sequence_number);
-			std::cout << "3a - State:"<< duplicate_packet << std::endl;
-
         }
     // step 3b
     } else {
         if (m_mib.itsGnAreaForwardingAlgorithm == BroadcastForwarding::Unspecified ||
             m_mib.itsGnAreaForwardingAlgorithm == BroadcastForwarding::SIMPLE) {
             duplicate_packet = detect_duplicate_packet(source_addr, gbc.sequence_number);
-			std::cout << "3b - State:"<< duplicate_packet << std::endl;
-
         }
     }
     // step 3a & 3b
     if (duplicate_packet) {
         // omit execution of further steps
-		std::cout << "omiting execution of further steps" << std::endl;
         return false;
     }
 
@@ -1066,8 +1058,6 @@ bool Router::process_extended(const ExtendedPduConstRefs<GeoBroadcastHeader>& pd
     if (m_mib.vanetzaMultiHopDuplicateAddressDetection) {
         // Be careful, DAD is broken with address mode AUTO for multi-hop communication
         detect_duplicate_address(source_addr, ll.sender);
-		std::cout << "executing DAD" << std::endl;
-
     }
 
     // step 5 & step 6 (make sure IS_NEIGHBOUR is false for new location table entry)
@@ -1077,8 +1067,6 @@ bool Router::process_extended(const ExtendedPduConstRefs<GeoBroadcastHeader>& pd
     if (!locte_exists) {
         // step 5b only
         source_entry.set_neighbour(false);
-		std::cout << "executing 5b" << std::endl;
-
     }
 
     // step 7: pass packet to upper layer if router is within destination area, return value
@@ -1090,18 +1078,15 @@ bool Router::process_extended(const ExtendedPduConstRefs<GeoBroadcastHeader>& pd
     // step 9: discard packet (no forwarding) if hop limit is reached
     if (pdu.basic().hop_limit <= 1) {
         forwarding_stopped(ForwardingStopReason::Hop_Limit);
-		std::cout << "forwarding_stopped. pdu.basic().hop_limit <= 1" << std::endl;
         return decide_pass_up(within_destination, gbc); // discard packet (step 9a)
     } else if (m_mib.itsGnMaxPacketDataRate < std::numeric_limits<decltype(m_mib.itsGnMaxPacketDataRate)>::max()) {
         // do packet data rate checks (annex B.2) if set maximum rate is not "infinity" (i.e. max unsigned value)
         if (source_entry.get_pdr() > m_mib.itsGnMaxPacketDataRate * 1000.0) {
             forwarding_stopped(ForwardingStopReason::Source_PDR);
-			std::cout << "Forwarding_stopped(source_entry.get_pdr() > m_mib.itsGnMaxPacketDataRate * 1000.0)" << std::endl;
             return decide_pass_up(within_destination, gbc); // omit forwarding, source exceeds PDR limit
         } else if (const auto* sender_entry = m_location_table.get_entry(ll.sender)) {
             if (sender_entry->get_pdr() > m_mib.itsGnMaxPacketDataRate * 1000.0) {
                 forwarding_stopped(ForwardingStopReason::Sender_PDR);
-				std::cout << "sender_entry->get_pdr() > m_mib.itsGnMaxPacketDataRate * 1000.0)" << std::endl;
                 return decide_pass_up(within_destination, gbc); // omit forwarding, sender exceeds PDR limit
             }
         }

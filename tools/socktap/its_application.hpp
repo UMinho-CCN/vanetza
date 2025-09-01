@@ -63,6 +63,7 @@ private:
     void handle_message(std::size_t bytes_transferred);
     void handle_receive_error(const std::error_code& error);
 
+
     int splitData(char* buffer, Denm_Data* data);
     void populateStruct(char* data, Denm_Data* denm_data, int index);    
 
@@ -85,9 +86,7 @@ private:
     asio::ip::udp::endpoint cam_endpoint;
 
     std::array<char, 1024> recv_buffer;
-	
-
-	
+		
 	MultihopType getMultihop();
     
 	MultihopType multihopType = MultihopType::off; 

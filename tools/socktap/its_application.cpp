@@ -325,7 +325,6 @@ void print_indentedDENM(std::ostream& os, const asn1::Denm& message, const std::
 }
 }
 
-
 void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr packet)
 {
     printf("Received Message\n\n");
@@ -383,28 +382,33 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
     }
     else if (denm) {
         std::cout << "Received DENM with decodable content" << std::endl;
+				
         if (print_rx_msg_) {  
-            std::cout << "Received DENM contains\n";
+            std::cout << "Received DENM contains\n" << std::endl;
             print_indentedDENM(std::cout, *denm, "  ", 1);
         }
+		else
+		{
+			std::cout << "Not printing\n" << std::endl;			
+		}
 		
 		switch (getMultihop()) 
 		{
 			case MultihopType::off:
 				// não fazer forwarding
-				std::cout << "Multihop Off - Not Forwarding\n";
+				std::cout << "Multihop Off - Not Forwarding\n" << std::endl;
 				break;
 			case MultihopType::flood:
 				// flooding
-				std::cout << "Multihop - Flooding\n";
+				std::cout << "Multihop - Flooding\n" << std::endl;
 				break;
 			case MultihopType::prob:
 				// forwarding probabilístico
-				std::cout << "Multihop - Prob\n";
+				std::cout << "Multihop - Prob\n" << std::endl;
 				break;
 			case MultihopType::geo:
 				// forwarding geo
-				std::cout << "Multihop - Geo\n";
+				std::cout << "Multihop - Geo\n" << std::endl;
 				break;
 		}
     }    
