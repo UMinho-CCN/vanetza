@@ -753,17 +753,17 @@ void ITSApplication::sendDenm(const json& j){
    // situation->eventType.causeCode = 9;
     
     const std::string eventTypeStr = proto2event.value("eventType", "unknown");
+    int causeCode = 0;  // Default to "Unavailable"
+    int subCauseCode = 0;  // Default to "Generic"
 
-    int causeCode = 0;  // default code if not recognized
-
-    if (eventTypeStr == "speeding") {
-        causeCode = 7;
-    } else if (eventTypeStr == "accident") {
-        causeCode = 10;
-    } else if (eventTypeStr == "roadwork") {
-        causeCode = 12;
+    if (eventTypeStr == "speeding" || eventTypeStr == "Jerk Detected") {
+        causeCode = 99;  // Dangerous situation
+        // subCauseCode remains 0 (generic)
+    } else if (eventTypeStr == "Entity outside safe zone") {
+        causeCode = 9;  // Hazardous location - Surface condition
+        // subCauseCode remains 0 (generic)
     }
-    // add other mappings as needed
+    // add other codes as needed
 
     situation->eventType.causeCode = causeCode;
     situation->eventType.subCauseCode = 0;
