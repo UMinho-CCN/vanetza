@@ -38,8 +38,8 @@ ManagementInformationBase::ManagementInformationBase() :
     itsGnMaxPacketDataRateEmaBeta(0.9),
     itsGnMaxGeoAreaSize(10 * kilo * kilo * square_meters),
     itsGnMinPacketRepetitionInterval(100 * milliseconds),
-    itsGnNonAreaForwardingAlgorithm(UnicastForwarding::Greedy),
-    itsGnAreaForwardingAlgorithm(BroadcastForwarding::CBF),
+    itsGnNonAreaForwardingAlgorithm(UnicastForwarding::Greedy), 
+    itsGnAreaForwardingAlgorithm(BroadcastForwarding::SIMPLE), //Using SIMPLE. CBF Does not work as intended for the use case. ping-pong effect
     itsGnCbfMinTime(1 * milliseconds),
     itsGnCbfMaxTime(100 * milliseconds),
     itsGnDefaultMaxCommunicationRange(1000 * meters),
