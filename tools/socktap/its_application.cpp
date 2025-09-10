@@ -750,25 +750,24 @@ void ITSApplication::sendDenm(const json& j){
     management.stationType = StationType_passengerCar;
 
     SituationContainer* situation = vanetza::asn1::allocate<SituationContainer_t>();
-   // situation->eventType.causeCode = 9;
-    
     const std::string eventTypeStr = proto2event.value("eventType", "unknown");
+    int causeCode = 0;  // Default to "Unavailable"
+    int subCauseCode = 0;  // Default to "Generic"
 
-    int causeCode = 0;  // default code if not recognized
-
-    if (eventTypeStr == "speeding") {
-        causeCode = 7;
-    } else if (eventTypeStr == "accident") {
-        causeCode = 10;
-    } else if (eventTypeStr == "roadwork") {
-        causeCode = 12;
+    if (eventTypeStr == "speeding" || eventTypeStr == "Jerk Detected") {
+        causeCode = 99;  // Dangerous situation
+        // subCauseCode remains 0 (generic)
+    } else if (eventTypeStr == "Entity outside safe zone") {
+        causeCode = 9;  // Hazardous location - Surface condition
+        // subCauseCode remains 0 (generic)
     }
-    // add other mappings as needed
+    // add other codes as needed
 
     situation->eventType.causeCode = causeCode;
     situation->eventType.subCauseCode = 0;
     message->denm.situation = situation;
-     //print generated DENM
+
+    //print generated DENM
     if (print_tx_msg_) {
         std::cout << "Generated DENM contains\n";
         asn_fprint(stdout, &asn_DEF_DENM,message.operator->());
@@ -778,10 +777,6 @@ void ITSApplication::sendDenm(const json& j){
 		throw std::runtime_error("Invalid DENM: " + error);
 	}
     
-    // message is moved, so no need to worry about manual cleanups here
-    // After this point, the ownership of `message` data has transferred to `packet`,
-    // and it will be cleaned up automatically when `packet` is destroyed.
-    // No further manual freeing of `message` resources is necessary.
     DownPacketPtr packet { new DownPacket() };
     packet->layer(OsiLayer::Application) = std::move(message);
     DataRequest request;
