@@ -1138,8 +1138,12 @@ void ITSApplication::sendSpatem(const json& j){
         }       
         ASN_SEQUENCE_ADD(&spatem.intersections.list, intersectionState);  
     }
-    // Print
-    asn_fprint(stdout, &asn_DEF_SPATEM, message.operator->());
+    
+    if (print_tx_msg_) {
+        std::cout << "Generated Full SPATEM contains:\n";
+        asn_fprint(stdout, &asn_DEF_SPATEM, message.operator->());
+    }
+ 
 
     DownPacketPtr packet { new DownPacket() };
     packet->layer(OsiLayer::Application) = std::move(message);
