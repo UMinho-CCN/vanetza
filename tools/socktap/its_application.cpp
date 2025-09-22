@@ -1084,9 +1084,7 @@ void ITSApplication::sendCPM(const json& j){
         throw std::runtime_error("CPM application data request failed");
     }
     } catch(std::runtime_error& e) {
-        std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;
-        
-        
+        std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;        
     }
 }
 
@@ -1098,40 +1096,29 @@ void ITSApplication::sendSpatem(const json& j){
     header.messageID = ItsPduHeader__messageID_spatem;
     header.stationID = this->station_id;
 
-
     SPAT_t& spatem = message->spat;
     for (const auto& intersectionObj : j) {
 
         spatem.intersections= *vanetza::asn1::allocate<IntersectionStateList_t>();
         auto intersectionState = vanetza::asn1::allocate<IntersectionState_t>();
         intersectionState->id.id=intersectionObj.value("intersectionId",0);
-        intersectionState->revision=10;
+        intersectionState->revision=10; //random number for now
 
-        //-----GPT------
-        // Allocate buffer
         intersectionState->status.buf = (uint8_t*)calloc(2, 1);
         intersectionState->status.size = 2;
         intersectionState->status.bits_unused = 0;
-
-        // Enable "trafficDependentOperation"
         intersectionState->status.buf[0] |= (1 << (7 - (IntersectionStatusObject_trafficDependentOperation % 8)));
-        //-----GPT------
+        
         intersectionState->states = *vanetza::asn1::allocate<MovementList_t>();
         for (const auto& stateObj : intersectionObj["states"]) {
-         
-  
-            //example with 3 tl in an intersetion
             
             MovementState_t *state = vanetza::asn1::allocate<MovementState_t>();
             state->signalGroup = stateObj.value("signalGroup",0); //TL identifier on the intersection
             state->state_time_speed = *vanetza::asn1::allocate<MovementEventList_t>();
 
             MovementEvent_t *event = vanetza::asn1::allocate<MovementEvent_t>();
-            event->eventState = stateObj.value("state",0); //stop and remain (MovementPhaseState_stop_And_Remain)
-            //event->eventState = 5; // green (MovementPhaseState_permissive_Movement_Allowed )
-            //event->eventState = 7; //yellow (MovementPhaseState_permissive_clearance)
-            
-        
+            event->eventState = stateObj.value("state",0); 
+
             ASN_SEQUENCE_ADD(&state->state_time_speed.list, event);    
             ASN_SEQUENCE_ADD(&intersectionState->states.list, state);  
 
@@ -1155,7 +1142,7 @@ void ITSApplication::sendSpatem(const json& j){
     try {
     auto confirm = Application::request(request, std::move(packet));
     if (!confirm.accepted()) {
-        throw std::runtime_error("CPM application data request failed");
+        throw std::runtime_error("Spatem application data request failed");
     }
     } catch(std::runtime_error& e) {
         std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;
