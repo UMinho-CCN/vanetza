@@ -877,9 +877,14 @@ void ITSApplication::sendDenm(const json& j){
 	}
 	
 	request.communication_profile = geonet::CommunicationProfile::ITS_G5;
+    try {
     auto confirm = Application::request(request, std::move(packet));
     if (!confirm.accepted()) {
         throw std::runtime_error("DENM application data request failed");
+    }
+    } catch(std::runtime_error& e) {
+        std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;
+
     }
 
 	
@@ -1018,7 +1023,9 @@ void ITSApplication::sendCPM(const json& j){
 
         // xSpeed - 1 -> 1 cm/s 
         asn_obj->xSpeed.value = obj.value("speed", 0);
-        asn_obj->xSpeed.confidence = obj.value("speedConfidence", 0);
+        int speedConf = obj.value("speedConfidence", 1);
+        asn_obj->xSpeed.confidence = (speedConf == 0 ? 1 : speedConf);
+
 
         //ySpeed - 0
         asn_obj->ySpeed.value = 0;
@@ -1036,7 +1043,9 @@ void ITSApplication::sendCPM(const json& j){
         if (obj.contains("heading")) {
             asn_obj->yawAngle = vanetza::asn1::allocate<CartesianAngle_t>();
             asn_obj->yawAngle->value =  obj.value("heading", 3601);  
-            asn_obj->yawAngle->confidence = obj.value("headingConfidence", 0);
+            int headingConf = obj.value("headingConfidence", 1);
+             asn_obj->yawAngle->confidence  = (headingConf == 0 ? 1 : headingConf);
+           
         }
 
         // Length 1 -> 0.1m
@@ -1146,7 +1155,6 @@ void ITSApplication::sendSpatem(const json& j){
     }
     } catch(std::runtime_error& e) {
         std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;
-        
-        
+
     }
 }
