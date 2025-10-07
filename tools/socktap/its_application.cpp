@@ -843,6 +843,9 @@ void ITSApplication::sendDenm(const json& j){
     } else if (eventTypeStr == "Entity outside safe zone") {
         causeCode = 9;  // Hazardous location - Surface condition
         // subCauseCode remains 0 (generic)
+    } else if(eventTypeStr == "collisionRisk"){
+        causeCode = 97; // Collision risk 
+        subCauseCode = 4; // Collision risk involving vulnerable road user 
     }
     // add other codes as needed
 
