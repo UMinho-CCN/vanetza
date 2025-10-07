@@ -1,8 +1,10 @@
 #include "its_application.hpp"
 #include <vanetza/btp/ports.hpp>
+#include "BIT_STRING.h"
 #include <vanetza/asn1/cam.hpp>
 #include <vanetza/asn1/denm.hpp>
 #include <vanetza/asn1/cpm.hpp>
+#include <vanetza/asn1/spatem.hpp>
 #include <vanetza/asn1/packet_visitor.hpp>
 #include <vanetza/facilities/cam_functions.hpp>
 #include <boost/units/cmath.hpp>
@@ -36,6 +38,71 @@ ITSApplication::ITSApplication(PositionProvider& positioning, Runtime& rt, asio:
     this->serverIP = strdup("192.168.1.100");
     this->start_receive();
 	
+}
+
+void print_indentedSpatem(std::ostream& os, const vanetza::asn1::Spatem& message, const std::string& indent, unsigned level) {
+    auto prefix = [&](const char* field) -> std::ostream& {
+        for (unsigned i = 0; i < level; ++i) {
+            os << indent;
+        }
+        os << field << ": ";
+        return os;
+    };
+
+    // Print ITS PDU Header
+    const ItsPduHeader_t& header = message->header;
+    prefix("ITS PDU Header") << "\n";
+    ++level;
+    prefix("Protocol Version") << static_cast<int>(header.protocolVersion) << "\n";
+    prefix("Message ID") << static_cast<int>(header.messageID) << "\n";
+    prefix("Station ID") << header.stationID << "\n";
+    --level;
+
+    // SPATEM content
+    const SPAT_t& spatem = message->spat;
+
+    prefix("Intersections") << "\n";
+    ++level;
+    for (int i = 0; i < spatem.intersections.list.count; ++i) {
+        const IntersectionState_t* intersection = spatem.intersections.list.array[i];
+        prefix("Intersection") << i << "\n";
+        ++level;
+        prefix("ID") << intersection->id.id << "\n";
+        prefix("Revision") << intersection->revision << "\n";
+
+        // Status bits
+        prefix("Status") << "\n";
+        ++level;
+        for (size_t b = 0; b < intersection->status.size; ++b) {
+            prefix(("Byte " + std::to_string(b)).c_str()) << std::bitset<8>(intersection->status.buf[b]) << "\n";
+        }
+        --level;
+
+        // Movements
+        prefix("Movements") << "\n";
+        ++level;
+        for (int j = 0; j < intersection->states.list.count; ++j) {
+            const MovementState_t* movement = intersection->states.list.array[j];
+            prefix("MovementState") << j << "\n";
+            ++level;
+            prefix("Signal Group") << movement->signalGroup << "\n";
+
+            // Movement events
+            prefix("State Time Speed") << "\n";
+            ++level;
+            for (int k = 0; k < movement->state_time_speed.list.count; ++k) {
+                const MovementEvent_t* event = movement->state_time_speed.list.array[k];
+                ++level;
+                prefix("Event State") << static_cast<int>(event->eventState) << "\n";
+                --level;
+            }
+            --level; // end Movement Events
+            --level; // end Movement
+        }
+        --level; // end Movements
+        --level; // end Intersection
+    }
+    --level; // end Intersections
 }
 
 void print_indentedCPM(std::ostream& os, const asn1::Cpm& message, const std::string& indent, unsigned level)
@@ -306,8 +373,12 @@ void ITSApplication::handle_message(std::size_t bytes_transferred){
     try {
         // Parse JSON from received data
         nlohmann::json proto2json = nlohmann::json::parse(data);
+    
         if(!proto2json["objects"].empty()){    
             this->sendCPM(proto2json["objects"]);
+        }
+        if(!proto2json["trafficLights"].empty()){
+            this->sendSpatem(proto2json["trafficLights"]);
         }
         if (!proto2json["events"].empty()) {
             const auto& events = proto2json["events"];
@@ -478,6 +549,10 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
     asn1::PacketVisitor<asn1::Cpm> cpmVisitor;
     std::shared_ptr<const asn1::Cpm> cpm = boost::apply_visitor(cpmVisitor, *packet);
 
+    //Try decode as SPATEM
+    asn1::PacketVisitor<asn1::Spatem> spatemVisitor;
+    std::shared_ptr<const asn1::Spatem> spatem = boost::apply_visitor(spatemVisitor, *packet);
+
     packet.get();
 
     if (cam) {
@@ -547,6 +622,13 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             print_indentedCPM(std::cout, *cpm, "  ", 1);
         }
     }
+    else if(spatem){
+        std::cout << "Received SPATEM with decodable content" << std::endl;
+        if (print_rx_msg_) {
+            std::cout << "Received SPATEM contains\n";
+             print_indentedSpatem(std::cout, *spatem, "  ", 1);
+        }
+    }
     else {
         std::cout << "Received packet with broken or unknown content" << std::endl;
     }
@@ -558,7 +640,8 @@ void ITSApplication::schedule_timer()
 }
 
 void ITSApplication::on_timer(Clock::time_point)
-{
+{   
+   
     schedule_timer();
     vanetza::asn1::Cam message;
 
@@ -794,9 +877,14 @@ void ITSApplication::sendDenm(const json& j){
 	}
 	
 	request.communication_profile = geonet::CommunicationProfile::ITS_G5;
+    try {
     auto confirm = Application::request(request, std::move(packet));
     if (!confirm.accepted()) {
         throw std::runtime_error("DENM application data request failed");
+    }
+    } catch(std::runtime_error& e) {
+        std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;
+
     }
 
 	
@@ -935,7 +1023,9 @@ void ITSApplication::sendCPM(const json& j){
 
         // xSpeed - 1 -> 1 cm/s 
         asn_obj->xSpeed.value = obj.value("speed", 0);
-        asn_obj->xSpeed.confidence = obj.value("speedConfidence", 0);
+        int speedConf = obj.value("speedConfidence", 1);
+        asn_obj->xSpeed.confidence = (speedConf == 0 ? 1 : speedConf);
+
 
         //ySpeed - 0
         asn_obj->ySpeed.value = 0;
@@ -953,7 +1043,9 @@ void ITSApplication::sendCPM(const json& j){
         if (obj.contains("heading")) {
             asn_obj->yawAngle = vanetza::asn1::allocate<CartesianAngle_t>();
             asn_obj->yawAngle->value =  obj.value("heading", 3601);  
-            asn_obj->yawAngle->confidence = obj.value("headingConfidence", 0);
+            int headingConf = obj.value("headingConfidence", 1);
+             asn_obj->yawAngle->confidence  = (headingConf == 0 ? 1 : headingConf);
+           
         }
 
         // Length 1 -> 0.1m
@@ -1001,8 +1093,68 @@ void ITSApplication::sendCPM(const json& j){
         throw std::runtime_error("CPM application data request failed");
     }
     } catch(std::runtime_error& e) {
+        std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;        
+    }
+}
+
+void ITSApplication::sendSpatem(const json& j){
+    vanetza::asn1::Spatem message;
+    // Header	
+    ItsPduHeader_t& header = message->header;
+	header.protocolVersion = 4;
+    header.messageID = ItsPduHeader__messageID_spatem;
+    header.stationID = this->station_id;
+
+    SPAT_t& spatem = message->spat;
+    for (const auto& intersectionObj : j) {
+
+        spatem.intersections= *vanetza::asn1::allocate<IntersectionStateList_t>();
+        auto intersectionState = vanetza::asn1::allocate<IntersectionState_t>();
+        intersectionState->id.id=intersectionObj.value("intersectionId",0);
+        intersectionState->revision=10; //random number for now
+
+        intersectionState->status.buf = (uint8_t*)calloc(2, 1);
+        intersectionState->status.size = 2;
+        intersectionState->status.bits_unused = 0;
+        intersectionState->status.buf[0] |= (1 << (7 - (IntersectionStatusObject_trafficDependentOperation % 8)));
+        
+        intersectionState->states = *vanetza::asn1::allocate<MovementList_t>();
+        for (const auto& stateObj : intersectionObj["states"]) {
+            
+            MovementState_t *state = vanetza::asn1::allocate<MovementState_t>();
+            state->signalGroup = stateObj.value("signalGroup",0); //TL identifier on the intersection
+            state->state_time_speed = *vanetza::asn1::allocate<MovementEventList_t>();
+
+            MovementEvent_t *event = vanetza::asn1::allocate<MovementEvent_t>();
+            event->eventState = stateObj.value("state",0); 
+
+            ASN_SEQUENCE_ADD(&state->state_time_speed.list, event);    
+            ASN_SEQUENCE_ADD(&intersectionState->states.list, state);  
+
+        }       
+        ASN_SEQUENCE_ADD(&spatem.intersections.list, intersectionState);  
+    }
+    
+    if (print_tx_msg_) {
+        std::cout << "Generated Full SPATEM contains:\n";
+        asn_fprint(stdout, &asn_DEF_SPATEM, message.operator->());
+    }
+ 
+
+    DownPacketPtr packet { new DownPacket() };
+    packet->layer(OsiLayer::Application) = std::move(message);
+    DataRequest request;
+    request.its_aid = aid::SA;
+    request.transport_type = geonet::TransportType::SHB;
+    request.communication_profile = geonet::CommunicationProfile::ITS_G5;
+    
+    try {
+    auto confirm = Application::request(request, std::move(packet));
+    if (!confirm.accepted()) {
+        throw std::runtime_error("Spatem application data request failed");
+    }
+    } catch(std::runtime_error& e) {
         std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;
-        
-        
+
     }
 }
