@@ -294,10 +294,7 @@ void print_indentedDENM(std::ostream& os, const asn1::Denm& message, const std::
     ++level;
     prefix("Latitude") << mgmt.eventPosition.latitude << "\n";
     prefix("Longitude") << mgmt.eventPosition.longitude << "\n";
-    if (mgmt.termination) {
-    long value = *mgmt.termination;
-    prefix("Termination") << value << "\n";
-    }
+
     // Position Confidence Ellipse
     prefix("Position Confidence Ellipse") << "\n";
     ++level;
@@ -534,66 +531,7 @@ int decode(const asn1::Cam& recvd, char* message){
     return strlen(message);
 }
 
-int decodeSpatem(const vanetza::asn1::Spatem& message, char* jsonMessage, size_t bufferSize) {
-    const ItsPduHeader_t& header = message->header;
-    const SPAT_t& spatem = message->spat;
 
-    int offset = 0;
-
-    offset += snprintf(jsonMessage + offset, bufferSize - offset,
-        "{ \"ITSHeader\": { \"protocolVersion\": %d, \"messageID\": %d, \"stationID\": %ld }, \"intersections\": [",
-        static_cast<int>(header.protocolVersion),
-        static_cast<int>(header.messageID),
-        header.stationID
-    );
-
-    for (int i = 0; i < spatem.intersections.list.count; ++i) {
-        const IntersectionState_t* intersection = spatem.intersections.list.array[i];
-
-        offset += snprintf(jsonMessage + offset, bufferSize - offset,
-            "%s{ \"id\": %d, \"revision\": %d, \"status\": [",
-            (i > 0 ? "," : ""),
-            intersection->id.id,
-            intersection->revision
-        );
-
-        // Status bytes
-        for (size_t b = 0; b < intersection->status.size; ++b) {
-            offset += snprintf(jsonMessage + offset, bufferSize - offset,
-                "%s%u",
-                (b > 0 ? "," : ""),
-                static_cast<unsigned>(intersection->status.buf[b])
-            );
-        }
-        offset += snprintf(jsonMessage + offset, bufferSize - offset, "], \"movements\": [");
-
-        // Movements
-        for (int j = 0; j < intersection->states.list.count; ++j) {
-            const MovementState_t* movement = intersection->states.list.array[j];
-
-            offset += snprintf(jsonMessage + offset, bufferSize - offset,
-                "%s{ \"signalGroup\": %d, \"stateTimeSpeed\": [",
-                (j > 0 ? "," : ""),
-                movement->signalGroup
-            );
-
-            for (int k = 0; k < movement->state_time_speed.list.count; ++k) {
-                const MovementEvent_t* event = movement->state_time_speed.list.array[k];
-                offset += snprintf(jsonMessage + offset, bufferSize - offset,
-                    "%s%d",
-                    (k > 0 ? "," : ""),
-                    static_cast<int>(event->eventState)
-                );
-            }
-            offset += snprintf(jsonMessage + offset, bufferSize - offset, "]}");
-        }
-        offset += snprintf(jsonMessage + offset, bufferSize - offset, "]}");
-    }
-
-    offset += snprintf(jsonMessage + offset, bufferSize - offset, "]}\n");
-
-    return offset; // returns the number of characters written
-}
 
 void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr packet)
 {
@@ -690,58 +628,6 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             std::cout << "Received SPATEM contains\n";
              print_indentedSpatem(std::cout, *spatem, "  ", 1);
         }
-        if(send_to_server){
-            char message[2000]; // Make sure buffer is large enough
-    int size = decodeSpatem(*spatem, message, sizeof(message)); 
-    nlohmann::json original = nlohmann::json::parse(message);  // single SPATEM object
-
-    // Build outgoing JSON
-    nlohmann::json outgoing;
-
-    // Add version and timestamp
-    const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
-    uint16_t gen_delta_time = static_cast<uint16_t>(time_now.count());
-    outgoing["version"] = 1.0;
-    outgoing["timestamp"] = gen_delta_time * GenerationDeltaTime_oneMilliSec;
-
-    // Wrap SPATEM object into an array
-    outgoing["objects"] = nlohmann::json::array();
-
-    // Empty events array
-    outgoing["events"] = nlohmann::json::array();
-
-    // Add trafficLights manually
-    outgoing["trafficLights"] = nlohmann::json::array();
-
-    // Example: populate trafficLights from SPATEM intersections
-    for (const auto& intersection : original["intersections"]) {
-        nlohmann::json trafficLightEntry;
-        trafficLightEntry["intersectionId"] = intersection["id"];
-        trafficLightEntry["states"] = nlohmann::json::array();
-
-        // Example: map movement signal groups to states
-        for (const auto& movement : intersection["movements"]) {
-            nlohmann::json state;
-            state["signalGroup"] = movement["signalGroup"];
-            // Here, map event state to some numeric state (example: take first event)
-            if (!movement["stateTimeSpeed"].empty()) {
-                state["state"] = movement["stateTimeSpeed"][0];
-            } else {
-                state["state"] = 0; // default if no event
-            }
-            trafficLightEntry["states"].push_back(state);
-        }
-
-        outgoing["trafficLights"].push_back(trafficLightEntry);
-    }
-    std::cout << "mENSAGEMA ENVIAR PARA O SV" << std::endl;
-    std::string jsonStr = outgoing.dump();
-    this->sendCAMToServer(jsonStr, jsonStr.size());
-    // Print or send
-    std::cout << outgoing.dump(4) << std::endl; // pretty-print JSON
-}
-        
-        
     }
     else {
         std::cout << "Received packet with broken or unknown content" << std::endl;
@@ -943,7 +829,7 @@ void ITSApplication::sendDenm(const json& j){
     } else {
         *management.relevanceDistance = RelevanceDistance_over10km;
     }
-   
+    
     management.stationType = StationType_passengerCar;
 
     SituationContainer* situation = vanetza::asn1::allocate<SituationContainer_t>();
@@ -960,17 +846,11 @@ void ITSApplication::sendDenm(const json& j){
     } else if(eventTypeStr == "collisionRisk"){
         causeCode = 97; // Collision risk 
         subCauseCode = 4; // Collision risk involving vulnerable road user 
-    }else if(eventTypeStr == "none"){ //termination code
-        causeCode = 0;
-        subCauseCode = 0;
-       management.termination = (Termination_t*) calloc(1, sizeof(Termination_t));
-*management.termination = Termination_isCancellation;
-
     }
     // add other codes as needed
 
     situation->eventType.causeCode = causeCode;
-    situation->eventType.subCauseCode = subCauseCode;
+    situation->eventType.subCauseCode = 0;
     message->denm.situation = situation;
 
     //print generated DENM
@@ -1262,7 +1142,8 @@ void ITSApplication::sendSpatem(const json& j){
         std::cout << "Generated Full SPATEM contains:\n";
         asn_fprint(stdout, &asn_DEF_SPATEM, message.operator->());
     }
-   
+ 
+
     DownPacketPtr packet { new DownPacket() };
     packet->layer(OsiLayer::Application) = std::move(message);
     DataRequest request;
