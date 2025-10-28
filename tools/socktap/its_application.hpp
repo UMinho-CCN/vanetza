@@ -43,7 +43,14 @@ public:
     void set_interval(vanetza::Clock::duration);
     void print_received_message(bool flag);
     void print_generated_message(bool flag);
+     void print_received_DENM(bool flag);
+    void print_generated_DENM(bool flag);
+     void print_received_CPM(bool flag);
+    void print_generated_CPM(bool flag);
+     void print_received_SPATEM(bool flag);
+    void print_generated_SPATEM(bool flag);
     void setSendToServer(bool send_to_server);
+    void setSendTologFile(bool send_to_logFile);
     void setServerPort(int serverPort);
     void setServerIP(const char * serverIP);
     void setStationID(int station_id);
@@ -72,8 +79,14 @@ private:
     vanetza::Clock::duration cam_interval_;
     bool print_rx_msg_ = false;
     bool print_tx_msg_ = false;
+    bool print_rx_DENM_ = false;
+    bool print_tx_DENM_ = false;
+    bool print_rx_CPM_ = false;
+    bool print_tx_CPM_ = false;
+    bool print_rx_SPATEM_ = false;
+    bool print_tx_SPATEM_ = false;
     bool send_to_server = false;
-    
+    bool send_to_logFile = false;
     int server_port;
     const char* serverIP;
 

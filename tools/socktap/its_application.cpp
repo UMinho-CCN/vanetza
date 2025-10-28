@@ -16,16 +16,16 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/asio.hpp>
 #include <boost/units/io.hpp>
+#include <fstream>
+#include <string>   // for std::string
 
 #include "nlohmann/json.hpp"
 
 // This is a very simple CA application sending CAMs at a fixed rate.
-
 using namespace vanetza;
 using namespace vanetza::facilities;
 using namespace std::chrono;
 namespace asio = boost::asio;
-
 
 ITSApplication::ITSApplication(PositionProvider& positioning, Runtime& rt, asio::io_service& io_service, unsigned short denm_port) :
     positioning_(positioning), runtime_(rt), cam_interval_(seconds(1)),
@@ -39,7 +39,13 @@ ITSApplication::ITSApplication(PositionProvider& positioning, Runtime& rt, asio:
     this->start_receive();
 	
 }
-
+void appendTologFile(const std::string& filename, const std::string& text) {
+    std::ofstream file(filename, std::ios::app); // open in append mode
+    if (file.is_open()) {
+        file << text << "\n";
+        file.close();
+    }
+}
 void print_indentedSpatem(std::ostream& os, const vanetza::asn1::Spatem& message, const std::string& indent, unsigned level) {
     auto prefix = [&](const char* field) -> std::ostream& {
         for (unsigned i = 0; i < level; ++i) {
@@ -60,7 +66,7 @@ void print_indentedSpatem(std::ostream& os, const vanetza::asn1::Spatem& message
 
     // SPATEM content
     const SPAT_t& spatem = message->spat;
-
+    prefix("Minute of the year") << spatem.timeStamp << "\n";
     prefix("Intersections") << "\n";
     ++level;
     for (int i = 0; i < spatem.intersections.list.count; ++i) {
@@ -74,7 +80,7 @@ void print_indentedSpatem(std::ostream& os, const vanetza::asn1::Spatem& message
         prefix("Status") << "\n";
         ++level;
         for (size_t b = 0; b < intersection->status.size; ++b) {
-            prefix(("Byte " + std::to_string(b)).c_str()) << std::bitset<8>(intersection->status.buf[b]) << "\n";
+       //     prefix(("Byte " + std::to_string(b)).c_str()) << std::bitset<8>(intersection->status.buf[b]) << "\n";
         }
         --level;
 
@@ -105,145 +111,172 @@ void print_indentedSpatem(std::ostream& os, const vanetza::asn1::Spatem& message
     --level; // end Intersections
 }
 
-void print_indentedCPM(std::ostream& os, const asn1::Cpm& message, const std::string& indent, unsigned level)
-{
+void print_indentedCPM(std::ostream& os, const asn1::Cpm& message, const std::string& indent, unsigned level){
     auto prefix = [&](const char* field) -> std::ostream& {
-        for (unsigned i = 0; i < level; ++i) {
+            for (unsigned i = 0; i < level; ++i) {
             os << indent;
-        }
-        os << field << ": ";
-        return os;
+            }
+            os << field << ": ";
+            return os;
     };
 
-    // ITS PDU Header
-    const ItsPduHeader_t& header = message->header;
-    prefix("ITS PDU Header") << "\n";
-    ++level;
-    prefix("Protocol Version") << static_cast<int>(header.protocolVersion) << "\n";
-    prefix("Message ID") << static_cast<int>(header.messageID) << "\n";
-    prefix("Station ID") << header.stationID << "\n";
-    --level;
-
-    // CPM content
-    const CollectivePerceptionMessage_t& cpm = message->cpm;
-    prefix("CPM") << "\n";
-    ++level;
-
-    prefix("Generation Delta Time") << cpm.generationDeltaTime << "\n";
-
-    // CPM Parameters
-    prefix("CPM Parameters") << "\n";
-    ++level;
-
-    // Management Container
-    prefix("Management Container") << "\n";
-    ++level;
-    const CpmManagementContainer_t& mgmt = cpm.cpmParameters.managementContainer;
-
-    prefix("Station Type") << static_cast<int>(mgmt.stationType) << "\n";
-
-    prefix("Reference Position") << "\n";
-    ++level;
-    prefix("Latitude") << mgmt.referencePosition.latitude << "\n";
-    prefix("Longitude") << mgmt.referencePosition.longitude << "\n";
-
-    prefix("Position Confidence Ellipse") << "\n";
-    ++level;
-    prefix("Semi Major Confidence") << mgmt.referencePosition.positionConfidenceEllipse.semiMajorConfidence << "\n";
-    prefix("Semi Minor Confidence") << mgmt.referencePosition.positionConfidenceEllipse.semiMinorConfidence << "\n";
-    prefix("Semi Major Orientation") << mgmt.referencePosition.positionConfidenceEllipse.semiMajorOrientation << "\n";
-    --level;
-
-    prefix("Altitude") << "\n";
-    ++level;
-    prefix("Altitude Value") << mgmt.referencePosition.altitude.altitudeValue << "\n";
-    prefix("Altitude Confidence") << static_cast<int>(mgmt.referencePosition.altitude.altitudeConfidence) << "\n";
-    --level; // end altitude
-    --level; // end reference position
-    --level; // end management container
-
-    // Perceived Object Container
-   prefix("Perceived Object Container") << "\n";
-    ++level;
-
-    // Iterate over perceived objects (if there are multiple)
-const PerceivedObjectContainer_t& perceived_objects = *cpm.cpmParameters.perceivedObjectContainer;
-
-for (int i = 0; i < perceived_objects.list.count; ++i) {
-    prefix(("Perceived Object " + std::to_string(i+1)).c_str()) << "\n";
+        // ITS PDU Header
+        const ItsPduHeader_t& header = message->header;
+        prefix("ITS PDU Header") << "\n";
         ++level;
+        prefix("Protocol Version") << static_cast<int>(header.protocolVersion) << "\n";
+        prefix("Message ID") << static_cast<int>(header.messageID) << "\n";
+        prefix("Station ID") << header.stationID << "\n";
+        --level;
+
+        // CPM content
+        const CollectivePerceptionMessage_t& cpm = message->cpm;
+        prefix("CPM") << "\n";
+        ++level;
+
+        prefix("Generation Delta Time") << cpm.generationDeltaTime << "\n";
+
+        // CPM Parameters
+        prefix("CPM Parameters") << "\n";
+        ++level;
+
+        // Management Container
+        prefix("Management Container") << "\n";
+        ++level;
+        const CpmManagementContainer_t& mgmt = cpm.cpmParameters.managementContainer;
+
+        prefix("Station Type") << static_cast<int>(mgmt.stationType) << "\n";
+
+        prefix("Reference Position") << "\n";
+        ++level;
+        prefix("Latitude") << mgmt.referencePosition.latitude << "\n";
+        prefix("Longitude") << mgmt.referencePosition.longitude << "\n";
+
+        prefix("Position Confidence Ellipse") << "\n";
+        ++level;
+        prefix("Semi Major Confidence") << mgmt.referencePosition.positionConfidenceEllipse.semiMajorConfidence << "\n";
+        prefix("Semi Minor Confidence") << mgmt.referencePosition.positionConfidenceEllipse.semiMinorConfidence << "\n";
+        prefix("Semi Major Orientation") << mgmt.referencePosition.positionConfidenceEllipse.semiMajorOrientation << "\n";
+        --level;
+
+        prefix("Altitude") << "\n";
+        ++level;
+        prefix("Altitude Value") << mgmt.referencePosition.altitude.altitudeValue << "\n";
+        prefix("Altitude Confidence") << static_cast<int>(mgmt.referencePosition.altitude.altitudeConfidence) << "\n";
+        --level; // end altitude
+        --level; // end reference position
+        --level; // end management container
+
+        // Perceived Object Container
+        prefix("Perceived Object Container") << "\n";
+        ++level;
+
+        // Iterate over perceived objects (if there are multiple)
+        const PerceivedObjectContainer_t& perceived_objects = *cpm.cpmParameters.perceivedObjectContainer;
+
+        for (int i = 0; i < perceived_objects.list.count; ++i) {
+        prefix(("Perceived Object " + std::to_string(i+1)).c_str()) << "\n";
+        ++level;
+
         const PerceivedObject_t& obj = *perceived_objects.list.array[i];
 
-        prefix("Object ID") << obj.objectID << "\n";
-        prefix("Time Of Measurement") << obj.timeOfMeasurement << "\n";
-        prefix("Object Confidence") << static_cast<int>(obj.objectConfidence) << "\n";
+        // Print only if present
+        if (obj.objectID) prefix("Object ID") << obj.objectID << "\n";
+        if (obj.timeOfMeasurement) prefix("Time Of Measurement") << obj.timeOfMeasurement << "\n";
+        if (obj.objectConfidence) prefix("Object Confidence") << static_cast<int>(obj.objectConfidence) << "\n";
 
-        prefix("X Distance") << "\n";
-        ++level;
-        prefix("Value") << obj.xDistance.value << "\n";
-        prefix("Confidence") << static_cast<int>(obj.xDistance.confidence) << "\n";
-        --level;
+        // Distances
+        if (obj.xDistance.value != 0) { 
+            prefix("X Distance") << "\n"; 
+            ++level;
+            prefix("Value") << obj.xDistance.value << "\n";
+            prefix("Confidence") << static_cast<int>(obj.xDistance.confidence) << "\n";
+            --level;
+        }
 
-        prefix("Y Distance") << "\n";
-        ++level;
-        prefix("Value") << obj.yDistance.value << "\n";
-        prefix("Confidence") << static_cast<int>(obj.yDistance.confidence) << "\n";
-        --level;
+        if (obj.yDistance.value != 0) { 
+            prefix("Y Distance") << "\n"; 
+            ++level;
+            prefix("Value") << obj.yDistance.value << "\n";
+            prefix("Confidence") << static_cast<int>(obj.yDistance.confidence) << "\n";
+            --level;
+        }
 
-        prefix("Z Distance") << "\n";
-        ++level;
-        prefix("Value") << obj.zDistance->value << "\n";
-        prefix("Confidence") << static_cast<int>(obj.zDistance->confidence) << "\n";
-        --level;
+        if (obj.zDistance) { 
+            prefix("Z Distance") << "\n"; 
+            ++level;
+            prefix("Value") << obj.zDistance->value << "\n";
+            prefix("Confidence") << static_cast<int>(obj.zDistance->confidence) << "\n";
+            --level;
+        }
 
-        prefix("X Speed") << "\n";
-        ++level;
-        prefix("Value") << obj.xSpeed.value << "\n";
-        prefix("Confidence") << static_cast<int>(obj.xSpeed.confidence) << "\n";
-        --level;
+        // Speeds
+        if (obj.xSpeed.value != 0 || obj.xSpeed.confidence != 0) {
+            prefix("X Speed") << "\n"; 
+            ++level;
+            prefix("Value") << obj.xSpeed.value << "\n";
+            prefix("Confidence") << static_cast<int>(obj.xSpeed.confidence) << "\n";
+            --level;
+        }
 
-        prefix("Y Speed") << "\n";
-        ++level;
-        prefix("Value") << obj.ySpeed.value << "\n";
-        prefix("Confidence") << static_cast<int>(obj.ySpeed.confidence) << "\n";
-        --level;
+        if (obj.ySpeed.value != 0 || obj.ySpeed.confidence != 0) {
+            prefix("Y Speed") << "\n"; 
+            ++level;
+            prefix("Value") << obj.ySpeed.value << "\n";
+            prefix("Confidence") << static_cast<int>(obj.ySpeed.confidence) << "\n";
+            --level;
+        }
 
-        prefix("X Acceleration") << "\n";
-        ++level;
-        prefix("Longitudinal Acceleration Value") << obj.xAcceleration->longitudinalAccelerationValue << "\n";
-        prefix("Longitudinal Acceleration Confidence") << static_cast<int>(obj.xAcceleration->longitudinalAccelerationConfidence) << "\n";
-        --level;
+        // Acceleration
+        if (obj.xAcceleration) {
+            prefix("X Acceleration") << "\n"; 
+            ++level;
+            prefix("Longitudinal Acceleration Value") << obj.xAcceleration->longitudinalAccelerationValue << "\n";
+            prefix("Longitudinal Acceleration Confidence") << static_cast<int>(obj.xAcceleration->longitudinalAccelerationConfidence) << "\n";
+            --level;
+        }
 
-        prefix("Yaw Angle") << "\n";
-        ++level;
-        prefix("Value") << obj.yawAngle->value << "\n";
-        prefix("Confidence") << static_cast<int>(obj.yawAngle->confidence) << "\n";
-        --level;
+        // Yaw Angle
+        if (obj.yawAngle) {
+            prefix("Yaw Angle") << "\n"; 
+            ++level;
+            prefix("Value") << obj.yawAngle->value << "\n";
+            prefix("Confidence") << static_cast<int>(obj.yawAngle->confidence) << "\n";
+            --level;
+        }
 
-        prefix("Planar Object Dimension 1") << "\n";
-        ++level;
-        prefix("Value") << obj.planarObjectDimension1->value << "\n";
-        prefix("Confidence") << static_cast<int>(obj.planarObjectDimension1->confidence) << "\n";
-        --level;
+        // Object dimensions
+        if (obj.planarObjectDimension1) {
+            prefix("Planar Object Dimension 1") << "\n"; 
+            ++level;
+            prefix("Value") << obj.planarObjectDimension1->value << "\n";
+            prefix("Confidence") << static_cast<int>(obj.planarObjectDimension1->confidence) << "\n";
+            --level;
+        }
 
-        prefix("Vertical Object Dimension") << "\n";
-        ++level;
-        prefix("Value") << obj.verticalObjectDimension->value << "\n";
+        if (obj.verticalObjectDimension) {
+            prefix("Vertical Object Dimension") << "\n"; 
+            ++level;
+            prefix("Value") << obj.verticalObjectDimension->value << "\n";
+            prefix("Confidence") << static_cast<int>(obj.verticalObjectDimension->confidence) << "\n";
+            --level;
+        }
+
+        if (obj.objectRefPoint) prefix("objectRefPoint") << obj.objectRefPoint << "\n";
+
+        --level; // end perceived object
+        }
+
+
+            if (cpm.cpmParameters.numberOfPerceivedObjects > 0)
+            prefix("Number Of Perceived Objects") << cpm.cpmParameters.numberOfPerceivedObjects << "\n";
+
         
-        prefix("Confidence") << static_cast<int>(obj.verticalObjectDimension->confidence) << "\n";
-        --level;
-        prefix("objectRefPoint") << obj.objectRefPoint << "\n";
-}
-    --level; // end perceived object container
-    prefix("Number Of Perceived Objects") << cpm.cpmParameters.numberOfPerceivedObjects << "\n";
-
-    
-    --level; // end cpmParameters
-    --level; // end CPM
+            --level; // end cpmParameters
+            --level; // end CPM
 }
 
-void print_indentedDENM(std::ostream& os, const asn1::Denm& message, const std::string& indent, unsigned level)
-{
+void print_indentedDENM(std::ostream& os, const asn1::Denm& message, const std::string& indent, unsigned level){
     auto prefix = [&](const char* field) -> std::ostream& {
         for (unsigned i = 0; i < level; ++i) {
             os << indent;
@@ -282,7 +315,7 @@ void print_indentedDENM(std::ostream& os, const asn1::Denm& message, const std::
         prefix("Detection Time") << "(invalid INTEGER)" << "\n";
     }
 
-// Reference Time
+
     long referenceTimeValue = 0;
     if (asn_INTEGER2long(&mgmt.referenceTime, &referenceTimeValue) == 0) {
         prefix("Reference Time") << referenceTimeValue << "\n";
@@ -294,7 +327,10 @@ void print_indentedDENM(std::ostream& os, const asn1::Denm& message, const std::
     ++level;
     prefix("Latitude") << mgmt.eventPosition.latitude << "\n";
     prefix("Longitude") << mgmt.eventPosition.longitude << "\n";
-
+    if (mgmt.termination) {
+    long value = *mgmt.termination;
+    prefix("Termination") << value << "\n";
+    }
     // Position Confidence Ellipse
     prefix("Position Confidence Ellipse") << "\n";
     ++level;
@@ -313,31 +349,31 @@ void print_indentedDENM(std::ostream& os, const asn1::Denm& message, const std::
     
    if (mgmt.relevanceDistance != nullptr) {
     prefix("Relevance Distance") << static_cast<int>(*mgmt.relevanceDistance) << "\n";
-} else {
-    prefix("Relevance Distance") << "(null)" << "\n";
-}
-    prefix("Station Type") << static_cast<int>(mgmt.stationType) << "\n";
-    --level; // end management container
+    } else {
+        prefix("Relevance Distance") << "(null)" << "\n";
+    }
+        prefix("Station Type") << static_cast<int>(mgmt.stationType) << "\n";
+        --level; // end management container
 
-    // Situation Container
-    prefix("Situation Container") << "\n";
-    ++level;
-    if (message->denm.situation != nullptr) {
-    const SituationContainer_t& situation = *(message->denm.situation);
+        // Situation Container
+        prefix("Situation Container") << "\n";
+        ++level;
+        if (message->denm.situation != nullptr) {
+        const SituationContainer_t& situation = *(message->denm.situation);
 
-    prefix("Information Quality") << static_cast<int>(situation.informationQuality) << "\n";
+        prefix("Information Quality") << static_cast<int>(situation.informationQuality) << "\n";
 
-    // Event Type (CauseCode)
-    prefix("Event Type") << "\n";
-    ++level;
-    prefix("Cause Code") << static_cast<int>(situation.eventType.causeCode) << "\n";
-    prefix("Sub Cause Code") << static_cast<int>(situation.eventType.subCauseCode) << "\n";
-    --level; // end event type
+        // Event Type (CauseCode)
+        prefix("Event Type") << "\n";
+        ++level;
+        prefix("Cause Code") << static_cast<int>(situation.eventType.causeCode) << "\n";
+        prefix("Sub Cause Code") << static_cast<int>(situation.eventType.subCauseCode) << "\n";
+        --level; // end event type
 
-    --level; // end situation container
-} else {
-    prefix("Situation Container") << "(null)" << "\n";
-}
+        --level; // end situation container
+    } else {
+        prefix("Situation Container") << "(null)" << "\n";
+    }
 }
 
 void ITSApplication::sendCAMToServer(const std::string& data, int size) {
@@ -442,6 +478,10 @@ int ITSApplication::createSocket(){
 
 
 
+void ITSApplication::setSendTologFile(bool send_to_logFile){
+    this->send_to_logFile = send_to_logFile;
+    
+}
 void ITSApplication::setSendToServer(bool send_to_server){
     this->send_to_server = send_to_server;
 }
@@ -475,19 +515,47 @@ void  ITSApplication::sendToServer(u_int64_t* dataToSend, int size){
 
 void ITSApplication::set_interval(Clock::duration interval)
 {
+    
     cam_interval_ = interval;
     runtime_.cancel(this);
     if(cam_interval_<=vanetza::Clock::duration{0}){
         std::cout << "CAM period to low, disabling" << std::endl;
+       
         return;
     }
     
     schedule_timer();
 }
+void ITSApplication::print_generated_DENM(bool flag)
+{
+    print_tx_DENM_ = flag;
+}
 
-void ITSApplication::print_generated_message(bool flag)
+void ITSApplication::print_received_DENM(bool flag)
+{
+    print_rx_DENM_ = flag;
+}
+void ITSApplication::print_generated_CPM(bool flag)
+{
+    print_tx_CPM_ = flag;
+}
+
+void ITSApplication::print_received_CPM(bool flag)
+{
+    print_rx_CPM_ = flag;
+}
+void ITSApplication::print_generated_SPATEM(bool flag)
 {
     print_tx_msg_ = flag;
+}
+
+void ITSApplication::print_received_SPATEM(bool flag)
+{
+    print_rx_SPATEM_ = flag;
+}
+void ITSApplication::print_generated_message(bool flag)
+{
+    print_tx_SPATEM_ = flag;
 }
 
 void ITSApplication::print_received_message(bool flag)
@@ -499,6 +567,8 @@ ITSApplication::PortType ITSApplication::port()
 {
     return btp::ports::CAM;
 }
+
+
 
 int decode(const asn1::Cam& recvd, char* message){
     const ItsPduHeader_t& header = recvd->header;
@@ -531,10 +601,68 @@ int decode(const asn1::Cam& recvd, char* message){
     return strlen(message);
 }
 
+int decodeSpatem(const vanetza::asn1::Spatem& message, char* jsonMessage, size_t bufferSize) {
+    const ItsPduHeader_t& header = message->header;
+    const SPAT_t& spatem = message->spat;
 
+    int offset = 0;
 
-void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr packet)
-{
+    offset += snprintf(jsonMessage + offset, bufferSize - offset,
+        "{ \"ITSHeader\": { \"protocolVersion\": %d, \"messageID\": %d, \"stationID\": %ld }, \"intersections\": [",
+        static_cast<int>(header.protocolVersion),
+        static_cast<int>(header.messageID),
+        header.stationID
+    );
+
+    for (int i = 0; i < spatem.intersections.list.count; ++i) {
+        const IntersectionState_t* intersection = spatem.intersections.list.array[i];
+
+        offset += snprintf(jsonMessage + offset, bufferSize - offset,
+            "%s{ \"id\": %d, \"revision\": %d, \"status\": [",
+            (i > 0 ? "," : ""),
+            intersection->id.id,
+            intersection->revision
+        );
+
+        // Status bytes
+        for (size_t b = 0; b < intersection->status.size; ++b) {
+            offset += snprintf(jsonMessage + offset, bufferSize - offset,
+                "%s%u",
+                (b > 0 ? "," : ""),
+                static_cast<unsigned>(intersection->status.buf[b])
+            );
+        }
+        offset += snprintf(jsonMessage + offset, bufferSize - offset, "], \"movements\": [");
+
+        // Movements
+        for (int j = 0; j < intersection->states.list.count; ++j) {
+            const MovementState_t* movement = intersection->states.list.array[j];
+
+            offset += snprintf(jsonMessage + offset, bufferSize - offset,
+                "%s{ \"signalGroup\": %d, \"stateTimeSpeed\": [",
+                (j > 0 ? "," : ""),
+                movement->signalGroup
+            );
+
+            for (int k = 0; k < movement->state_time_speed.list.count; ++k) {
+                const MovementEvent_t* event = movement->state_time_speed.list.array[k];
+                offset += snprintf(jsonMessage + offset, bufferSize - offset,
+                    "%s%d",
+                    (k > 0 ? "," : ""),
+                    static_cast<int>(event->eventState)
+                );
+            }
+            offset += snprintf(jsonMessage + offset, bufferSize - offset, "]}");
+        }
+        offset += snprintf(jsonMessage + offset, bufferSize - offset, "]}");
+    }
+
+    offset += snprintf(jsonMessage + offset, bufferSize - offset, "]}\n");
+
+    return offset; // returns the number of characters written
+}
+
+void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr packet){
     printf("Received Message\n\n");
 
     // Try decode as CAM
@@ -557,6 +685,33 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
 
     if (cam) {
         std::cout << "Received CAM with decodable content" << std::endl;
+        if(send_to_logFile){
+            char sender_timeStamp_str [500];
+            char sender_station_id_str [500];
+            const ItsPduHeader_t& headerRef = (*cam)->header;
+            const CoopAwareness_t& camRef = (*cam)->cam;
+
+            
+            int size2 = snprintf(sender_timeStamp_str, sizeof(sender_timeStamp_str), "%ld", camRef.generationDeltaTime);
+            int size3 = snprintf(sender_station_id_str, sizeof(sender_station_id_str), "%ld", headerRef.stationID);
+
+            // Print the result
+            std::cout << sender_timeStamp_str << std::endl;
+            std::cout << sender_station_id_str << std::endl;
+            // Print the result
+           
+            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
+            uint16_t gen_delta_time = time_now.count();
+            std::string receiver_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
+            long long timestamp_ms = std::stoll(sender_timeStamp_str);  
+            std::time_t tt = timestamp_ms / 1000;
+            std::string sender_timeStampUnix_str = std::ctime(&tt);
+            if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
+            sender_timeStampUnix_str.pop_back();
+            }
+            std::string receiver_station_id_str = std::to_string(this->station_id);
+            appendTologFile("log.txt","1,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+        }
         if (print_rx_msg_) {
             std::cout << "Received CAM contains\n";
             print_indented(std::cout, *cam, "  ", 1);
@@ -593,8 +748,31 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
     }
     else if (denm) {
         std::cout << "Received DENM with decodable content" << std::endl;
-        if (print_rx_msg_) {  
+        if(send_to_logFile){
+            char sender_timeStamp_str [500];
+            char sender_station_id_str [500];
+            const ItsPduHeader_t& headerRef = (*denm)->header;
+            const ManagementContainer_t& mgmtRef = (*denm)->denm.management;
+            long referenceTimeValue = 0;
+            asn_INTEGER2long(&mgmtRef.referenceTime, &referenceTimeValue);
+            int size2 = snprintf(sender_timeStamp_str, sizeof(sender_timeStamp_str), "%ld", referenceTimeValue);
+            int size3 = snprintf(sender_station_id_str, sizeof(sender_station_id_str), "%ld", headerRef.stationID);
+            std::cout << sender_timeStamp_str<< std::endl; 
+            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
+            uint16_t gen_delta_time = time_now.count();
+            std::string receiver_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
+            long long timestamp_ms = std::stoll(sender_timeStamp_str);  
+            std::time_t tt = timestamp_ms / 1000;
+            std::string sender_timeStampUnix_str = std::ctime(&tt);
+            if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
+            sender_timeStampUnix_str.pop_back();
+            }
+            std::string receiver_station_id_str = std::to_string(this->station_id);
+            appendTologFile("log.txt","1,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+        }
+        if (print_rx_DENM_) {  
             std::cout << "Received DENM contains\n";
+           
             print_indentedDENM(std::cout, *denm, "  ", 1);
         }
 		
@@ -617,17 +795,109 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
     else if (cpm) {
         
         std::cout << "Received CPM with decodable content" << std::endl;
-        if (print_rx_msg_) {
+        if(send_to_logFile){
+            char sender_timeStamp_str [500];
+            char sender_station_id_str [500];
+            const ItsPduHeader_t& headerRef = (*cpm)->header;
+            const CollectivePerceptionMessage_t& cpmRef = (*cpm)->cpm;
+            int size2 = snprintf(sender_timeStamp_str, sizeof(sender_timeStamp_str), "%ld", cpmRef.generationDeltaTime);
+            int size3 = snprintf(sender_station_id_str, sizeof(sender_station_id_str), "%ld", headerRef.stationID);
+            
+           const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
+            uint16_t gen_delta_time = time_now.count();
+            std::string receiver_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
+            long long timestamp_ms = std::stoll(sender_timeStamp_str);  
+            std::time_t tt = timestamp_ms / 1000;
+            std::string sender_timeStampUnix_str = std::ctime(&tt);
+            if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
+            sender_timeStampUnix_str.pop_back();
+            }
+            std::string receiver_station_id_str = std::to_string(this->station_id);
+            appendTologFile("log.txt","1,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+        }
+        if (print_rx_CPM_) {
             std::cout << "Received CPM contains\n";
+           
             print_indentedCPM(std::cout, *cpm, "  ", 1);
         }
     }
     else if(spatem){
         std::cout << "Received SPATEM with decodable content" << std::endl;
-        if (print_rx_msg_) {
+        if(send_to_logFile){
+            char sender_timeStamp_str [500];
+            char sender_station_id_str [500];
+            const ItsPduHeader_t& headerRef = (*spatem)->header;
+            const  SPAT_t& spatemRef = (*spatem)->spat;
+            int size = sprintf(sender_timeStamp_str, "%ld", *spatemRef.timeStamp);
+            int size3 = snprintf(sender_station_id_str, sizeof(sender_station_id_str), "%ld", headerRef.stationID);
+           
+            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
+            uint16_t gen_delta_time = static_cast<uint16_t>(time_now.count() % 65536);
+            std::string receiver_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
+            long long timestamp_ms = std::stoll(sender_timeStamp_str);  
+            std::time_t tt = timestamp_ms / 1000;
+            std::string sender_timeStampUnix_str = std::ctime(&tt);
+            if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
+            sender_timeStampUnix_str.pop_back();
+            }
+            std::string receiver_station_id_str = std::to_string(this->station_id);
+            appendTologFile("log.txt","1,SPATEM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+        }
+        if (print_rx_SPATEM_) {
             std::cout << "Received SPATEM contains\n";
+         
              print_indentedSpatem(std::cout, *spatem, "  ", 1);
         }
+        if(send_to_server){
+            char message[2000]; // Make sure buffer is large enough
+    int size = decodeSpatem(*spatem, message, sizeof(message)); 
+    nlohmann::json original = nlohmann::json::parse(message);  // single SPATEM object
+
+    // Build outgoing JSON
+    nlohmann::json outgoing;
+
+    // Add version and timestamp
+    const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
+    uint16_t gen_delta_time = static_cast<uint16_t>(time_now.count());
+    outgoing["version"] = 1.0;
+    outgoing["timestamp"] = gen_delta_time * GenerationDeltaTime_oneMilliSec;
+
+    // Wrap SPATEM object into an array
+    outgoing["objects"] = nlohmann::json::array();
+
+    // Empty events array
+    outgoing["events"] = nlohmann::json::array();
+
+    // Add trafficLights manually
+    outgoing["trafficLights"] = nlohmann::json::array();
+
+    // Example: populate trafficLights from SPATEM intersections
+    for (const auto& intersection : original["intersections"]) {
+        nlohmann::json trafficLightEntry;
+        trafficLightEntry["intersectionId"] = intersection["id"];
+        trafficLightEntry["states"] = nlohmann::json::array();
+
+        // Example: map movement signal groups to states
+        for (const auto& movement : intersection["movements"]) {
+            nlohmann::json state;
+            state["signalGroup"] = movement["signalGroup"];
+            // Here, map event state to some numeric state (example: take first event)
+            if (!movement["stateTimeSpeed"].empty()) {
+                state["state"] = movement["stateTimeSpeed"][0];
+            } else {
+                state["state"] = 0; // default if no event
+            }
+            trafficLightEntry["states"].push_back(state);
+        }
+
+        outgoing["trafficLights"].push_back(trafficLightEntry);
+    }
+    
+    std::string jsonStr = outgoing.dump();
+    this->sendCAMToServer(jsonStr, jsonStr.size());
+    }
+        
+        
     }
     else {
         std::cout << "Received packet with broken or unknown content" << std::endl;
@@ -655,7 +925,7 @@ void ITSApplication::on_timer(Clock::time_point)
 
     CoopAwareness_t& cam = message->cam;
     cam.generationDeltaTime = gen_delta_time * GenerationDeltaTime_oneMilliSec;
-
+    
     auto position = positioning_.position_fix();
 
     if (!position.confidence) {
@@ -726,6 +996,17 @@ void ITSApplication::on_timer(Clock::time_point)
     if (!confirm.accepted()) {
         throw std::runtime_error("CAM application data request failed");
     }
+
+    if(send_to_logFile){
+        std::string sender_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
+        std::time_t tt = (gen_delta_time * GenerationDeltaTime_oneMilliSec) / 1000;
+        std::string sender_timeStampUnix_str = std::ctime(&tt);
+        if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
+        sender_timeStampUnix_str.pop_back();
+        }
+        std::string sender_station_id_str = std::to_string(this->station_id);
+        appendTologFile("log.txt","0,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+    }
 }
 
 void ITSApplication::sendDenm(const json& j){
@@ -745,47 +1026,29 @@ void ITSApplication::sendDenm(const json& j){
     // Management
     ManagementContainer_t& management = message->denm.management;
     //action id
-    //management.actionID.originatingStationID = 1;
-    management.actionID.originatingStationID = atoi(proto2event.value("origin", "1").c_str());
+    management.actionID.originatingStationID = 1;
+    /*std::string origin = proto2event.value("origin", "1");
+
+    if (origin == "ITS-PLAT") {
+    management.actionID.originatingStationID = 255;}
+    else{
+    management.actionID.originatingStationID = atoi(proto2event.value("origin", "1").c_str());}*/
     management.actionID.sequenceNumber = counter;
 
 
         //detection time
-    const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
-
-    //uint64_t time = 45000000000;
-   /* uint64_t time = time_now.count();
-    uint64_t time = 45000000000;
-
-	// XXX: possible memory leak, free allocated memory
-    management.detectionTime.buf = (uint8_t*) malloc(sizeof(uint64_t));
-    management.detectionTime.size = sizeof(uint64_t);
     
-    for (size_t i = 0; i < management.detectionTime.size; ++i) {
-        management.detectionTime.buf[i] = (time >> (8 * (management.detectionTime.size - 1 - i))) & 0xFF;
-    }
-
-    //reference time
-   // uint64_t ref_time = 45000000000;
-    uint64_t ref_time = time_now.count();
-    management.referenceTime.buf = (uint8_t*) malloc(sizeof(uint64_t));
-    management.referenceTime.size = sizeof(uint64_t);
-
-    for (size_t i = 0; i < management.referenceTime.size; ++i) {
-        management.referenceTime.buf[i] = (ref_time >> (8 * (management.referenceTime.size - 1 - i))) & 0xFF;
-    }*/
-
-    //detectionTime and referenceTime are set using asn_long2INTEGER() — no manual malloc/free, so no leaks there.
     INTEGER_t* detectionTime = &management.detectionTime;
-    long timeValue = time_now.count();
-    int ret = asn_long2INTEGER(detectionTime, timeValue);
+    const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
+    uint16_t timeValue = time_now.count(); // Mask to get the lower 16 bits
+    int ret = asn_long2INTEGER(detectionTime, timeValue * GenerationDeltaTime_oneMilliSec);
     if (ret != 0) {
         throw std::runtime_error("Failed to set detectionTime integer");
     }
 
     // Same for referenceTime
     INTEGER_t* referenceTime = &management.referenceTime;
-    ret = asn_long2INTEGER(referenceTime, timeValue);
+    ret = asn_long2INTEGER(referenceTime, timeValue * GenerationDeltaTime_oneMilliSec);
     if (ret != 0) {
         throw std::runtime_error("Failed to set referenceTime integer");
     }
@@ -829,7 +1092,7 @@ void ITSApplication::sendDenm(const json& j){
     } else {
         *management.relevanceDistance = RelevanceDistance_over10km;
     }
-    
+   
     management.stationType = StationType_passengerCar;
 
     SituationContainer* situation = vanetza::asn1::allocate<SituationContainer_t>();
@@ -837,24 +1100,30 @@ void ITSApplication::sendDenm(const json& j){
     int causeCode = 0;  // Default to "Unavailable"
     int subCauseCode = 0;  // Default to "Generic"
 
-    if (eventTypeStr == "speeding" || eventTypeStr == "Jerk Detected") {
+    if (eventTypeStr == "speeding" || eventTypeStr == "JERK_INFRACTION" || eventTypeStr == "SPEED_INFRACTION") {
         causeCode = 99;  // Dangerous situation
         // subCauseCode remains 0 (generic)
-    } else if (eventTypeStr == "Entity outside safe zone") {
+    } else if (eventTypeStr == "SAFEZONE_INFRACION") {
         causeCode = 9;  // Hazardous location - Surface condition
         // subCauseCode remains 0 (generic)
     } else if(eventTypeStr == "collisionRisk"){
         causeCode = 97; // Collision risk 
         subCauseCode = 4; // Collision risk involving vulnerable road user 
+    }else if(eventTypeStr == "UNKNOWN"||eventTypeStr == "collisionRiskEnd" ){ //termination code
+        causeCode = 0;
+        subCauseCode = 0;
+        management.termination = (Termination_t*) calloc(1, sizeof(Termination_t));
+        *management.termination = Termination_isCancellation;
+
     }
     // add other codes as needed
 
     situation->eventType.causeCode = causeCode;
-    situation->eventType.subCauseCode = 0;
+    situation->eventType.subCauseCode = subCauseCode;
     message->denm.situation = situation;
 
     //print generated DENM
-    if (print_tx_msg_) {
+    if (print_tx_DENM_) {
         std::cout << "Generated DENM contains\n";
         asn_fprint(stdout, &asn_DEF_DENM,message.operator->());
     }
@@ -889,12 +1158,20 @@ void ITSApplication::sendDenm(const json& j){
         std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;
 
     }
-
-	
+     if(send_to_logFile){
+        uint16_t gen_delta_time = time_now.count();
+        std::string sender_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
+        std::time_t tt = (gen_delta_time * GenerationDeltaTime_oneMilliSec) / 1000;
+        std::string sender_timeStampUnix_str = std::ctime(&tt);
+        if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
+        sender_timeStampUnix_str.pop_back();
+        }
+        std::string sender_station_id_str = std::to_string(this->station_id);
+        appendTologFile("log.txt","0,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+    }
 }
 
-void ITSApplication::setMultihop(const std::string& type) 
-{
+void ITSApplication::setMultihop(const std::string& type) {
 	std::cout << "multihop type:" << type << std::endl;
 
 	if (type == "off") {
@@ -911,8 +1188,7 @@ void ITSApplication::setMultihop(const std::string& type)
 	}
 }
 
-MultihopType ITSApplication::getMultihop() 
-{
+MultihopType ITSApplication::getMultihop() {
 	return multihopType;
 }
 void ITSApplication::sendCPM(const json& j){
@@ -1024,8 +1300,19 @@ void ITSApplication::sendCPM(const json& j){
             asn_obj->zDistance->confidence = obj.value("altitudeConfidence", 0);
         }
 
+        
         // xSpeed - 1 -> 1 cm/s 
-        asn_obj->xSpeed.value = obj.value("speed", 0);
+            int speed = obj.value("speed", 0);
+
+        // Read originID once
+        std::string originID = obj.value("originID", "");
+
+        // Adjust speed if originID is "camera1"
+        if (originID == "camera1") {
+            speed /= 100;  // divide by 100 if it's too large
+        }
+        asn_obj->xSpeed.value = speed;
+        
         int speedConf = obj.value("speedConfidence", 1);
         asn_obj->xSpeed.confidence = (speedConf == 0 ? 1 : speedConf);
 
@@ -1045,7 +1332,15 @@ void ITSApplication::sendCPM(const json& j){
         // yawAngle 1 -> 0.1º
         if (obj.contains("heading")) {
             asn_obj->yawAngle = vanetza::asn1::allocate<CartesianAngle_t>();
-            asn_obj->yawAngle->value =  obj.value("heading", 3601);  
+            int heading = obj.value("heading", 3600);
+
+            // Adjust heading if originID is "camera1"
+            if (originID == "camera1") {
+                heading /= 100;  // divide by 1000 if it's too large
+            }
+
+            // Assign to ASN object
+            asn_obj->yawAngle->value = heading;
             int headingConf = obj.value("headingConfidence", 1);
              asn_obj->yawAngle->confidence  = (headingConf == 0 ? 1 : headingConf);
            
@@ -1065,21 +1360,14 @@ void ITSApplication::sendCPM(const json& j){
             asn_obj->verticalObjectDimension->confidence = obj.value("vehicleLengthConfidence", 0);
         }
 
-        // 10. Object confidence - default - unknown
         asn_obj->objectConfidence = 0;
-
-        // object RefPoint - Defualt
         asn_obj->objectRefPoint = 0;
-
-
-        // 12. Add to ASN.1 sequence
         ASN_SEQUENCE_ADD(&cpmparams.perceivedObjectContainer->list, asn_obj);
     }
 
-    //number of perceivedobjects value
     cpmparams.numberOfPerceivedObjects = cpmparams.perceivedObjectContainer->list.count;
 
-    if (print_tx_msg_) {
+    if (print_tx_CPM_) {
         std::cout << "Generated Full CPM contains:\n";
         asn_fprint(stdout, &asn_DEF_CPM, cpmmessage.operator->());
     }
@@ -1098,6 +1386,16 @@ void ITSApplication::sendCPM(const json& j){
     } catch(std::runtime_error& e) {
         std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;        
     }
+    if(send_to_logFile){
+        std::string sender_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
+        std::time_t tt = (gen_delta_time * GenerationDeltaTime_oneMilliSec) / 1000;
+        std::string sender_timeStampUnix_str = std::ctime(&tt);
+        if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
+        sender_timeStampUnix_str.pop_back();
+        }
+        std::string sender_station_id_str = std::to_string(this->station_id);
+        appendTologFile("log.txt","0,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+    }
 }
 
 void ITSApplication::sendSpatem(const json& j){
@@ -1109,6 +1407,12 @@ void ITSApplication::sendSpatem(const json& j){
     header.stationID = this->station_id;
 
     SPAT_t& spatem = message->spat;
+    const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
+    uint16_t gen_delta_time = static_cast<uint16_t>(time_now.count() % 65536);
+    MinuteOfTheYear_t* timeStampValue = new MinuteOfTheYear_t;
+    *timeStampValue = static_cast<MinuteOfTheYear_t>(gen_delta_time); 
+
+    spatem.timeStamp = timeStampValue;
     for (const auto& intersectionObj : j) {
 
         spatem.intersections= *vanetza::asn1::allocate<IntersectionStateList_t>();
@@ -1138,12 +1442,11 @@ void ITSApplication::sendSpatem(const json& j){
         ASN_SEQUENCE_ADD(&spatem.intersections.list, intersectionState);  
     }
     
-    if (print_tx_msg_) {
+    if (print_tx_SPATEM_) {
         std::cout << "Generated Full SPATEM contains:\n";
         asn_fprint(stdout, &asn_DEF_SPATEM, message.operator->());
     }
- 
-
+   
     DownPacketPtr packet { new DownPacket() };
     packet->layer(OsiLayer::Application) = std::move(message);
     DataRequest request;
@@ -1159,5 +1462,15 @@ void ITSApplication::sendSpatem(const json& j){
     } catch(std::runtime_error& e) {
         std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;
 
+    }
+    if(send_to_logFile){
+        std::string sender_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
+        std::time_t tt = (gen_delta_time * GenerationDeltaTime_oneMilliSec) / 1000;
+        std::string sender_timeStampUnix_str = std::ctime(&tt);
+        if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
+        sender_timeStampUnix_str.pop_back();
+        }
+        std::string sender_station_id_str = std::to_string(this->station_id);
+        appendTologFile("log.txt","0,SPATEM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
     }
 }

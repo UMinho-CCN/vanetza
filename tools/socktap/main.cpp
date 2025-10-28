@@ -38,8 +38,13 @@ int main(int argc, const char** argv)
         ("print-tx-cam", "Print generated CAMs")
         ("print-rx-denm", "Print received DENMs")
         ("print-tx-denm", "Print generated DENMs")
+        ("print-rx-cpm", "Print received CPMs")
+        ("print-tx-cpm", "Print generated CPMs")
+        ("print-rx-spatem", "Print received SPATEMs")
+        ("print-tx-spatem", "Print generated SPATEMs")
         ("benchmark", "Enable benchmarking")
         ("send-to-server", "Send V2X data to server")
+        ("send-to-logFile", "Store V2X received/tranmissions in file")
         ("send-to-file", "Store V2X data in a file")
         ("file",po::value<std::string>()->default_value("v2x_data.bin"), "File")
         ("server-ip",po::value<std::string>()->default_value("192.168.1.124"), "Server IP")
@@ -182,7 +187,16 @@ int main(int argc, const char** argv)
                 its->set_interval(std::chrono::milliseconds(vm["cam-interval"].as<unsigned>()));
                 its->print_received_message(vm.count("print-rx-cam") > 0);
                 its->print_generated_message(vm.count("print-tx-cam") > 0);
-				
+                its->print_received_DENM(vm.count("print-rx-denm") > 0);
+                its->print_generated_DENM(vm.count("print-tx-denm") > 0);
+                its->print_received_CPM(vm.count("print-rx-cpm") > 0);
+                its->print_generated_CPM(vm.count("print-tx-cpm") > 0);
+                its->print_received_SPATEM(vm.count("print-rx-spatem") > 0);
+                its->print_generated_SPATEM(vm.count("print-tx-spatem") > 0);
+				if(vm.count("send-to-logFile") > 0){
+                   
+                    its->setSendTologFile(true);
+                }
 				its->setMultihop(vm["multihop"].as<std::string>());
 				
                 its->setStationID(vm["station-id"].as<unsigned>());
