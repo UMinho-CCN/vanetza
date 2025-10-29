@@ -710,7 +710,7 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             sender_timeStampUnix_str.pop_back();
             }
             std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("log.txt","1,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+            appendTologFile("/usr/local/bin/log.txt","1,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
         }
         if (print_rx_msg_) {
             std::cout << "Received CAM contains\n";
@@ -768,7 +768,7 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             sender_timeStampUnix_str.pop_back();
             }
             std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("log.txt","1,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+            appendTologFile("/usr/local/bin/log.txt","1,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
         }
         if (print_rx_DENM_) {  
             std::cout << "Received DENM contains\n";
@@ -813,7 +813,7 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             sender_timeStampUnix_str.pop_back();
             }
             std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("log.txt","1,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+            appendTologFile("/usr/local/bin/log.txt","1,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
         }
         if (print_rx_CPM_) {
             std::cout << "Received CPM contains\n";
@@ -841,7 +841,7 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             sender_timeStampUnix_str.pop_back();
             }
             std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("log.txt","1,SPATEM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+            appendTologFile("/usr/local/bin/log.txt","1,SPATEM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
         }
         if (print_rx_SPATEM_) {
             std::cout << "Received SPATEM contains\n";
@@ -1005,7 +1005,7 @@ void ITSApplication::on_timer(Clock::time_point)
         sender_timeStampUnix_str.pop_back();
         }
         std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("log.txt","0,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+        appendTologFile("/usr/local/bin/log.txt","0,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
     }
 }
 
@@ -1167,7 +1167,7 @@ void ITSApplication::sendDenm(const json& j){
         sender_timeStampUnix_str.pop_back();
         }
         std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("log.txt","0,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+        appendTologFile("/usr/local/bin/log.txt","0,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
     }
 }
 
@@ -1394,7 +1394,7 @@ void ITSApplication::sendCPM(const json& j){
         sender_timeStampUnix_str.pop_back();
         }
         std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("log.txt","0,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+        appendTologFile("/usr/local/bin/log.txt","0,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
     }
 }
 
@@ -1471,6 +1471,6 @@ void ITSApplication::sendSpatem(const json& j){
         sender_timeStampUnix_str.pop_back();
         }
         std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("log.txt","0,SPATEM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+        appendTologFile("/usr/local/bin/txt","0,SPATEM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
     }
 }
