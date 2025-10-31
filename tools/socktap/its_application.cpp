@@ -731,7 +731,7 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             // Copy version and timestamp
             outgoing["version"] = 1.0;
             outgoing["timestamp"] = gen_delta_time * GenerationDeltaTime_oneMilliSec;
-
+            original["classID"] = 2;
 
             // Wrap the single object into an array
             outgoing["objects"] = json::array({ original });
@@ -741,7 +741,6 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
 
             // Serialize and send
             std::string jsonStr = outgoing.dump();
-            //std::cout << "A enviar Proto2 para a plataforma:\n" << outgoing.dump(4) << std::endl;
             this->sendCAMToServer(jsonStr, jsonStr.size());
            // this->sendToServer((u_int64_t*)message, size);
         }
@@ -850,52 +849,52 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
         }
         if(send_to_server){
             char message[2000]; // Make sure buffer is large enough
-    int size = decodeSpatem(*spatem, message, sizeof(message)); 
-    nlohmann::json original = nlohmann::json::parse(message);  // single SPATEM object
+                int size = decodeSpatem(*spatem, message, sizeof(message)); 
+                nlohmann::json original = nlohmann::json::parse(message);  // single SPATEM object
 
-    // Build outgoing JSON
-    nlohmann::json outgoing;
+                // Build outgoing JSON
+                nlohmann::json outgoing;
 
-    // Add version and timestamp
-    const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
-    uint16_t gen_delta_time = static_cast<uint16_t>(time_now.count());
-    outgoing["version"] = 1.0;
-    outgoing["timestamp"] = gen_delta_time * GenerationDeltaTime_oneMilliSec;
+                // Add version and timestamp
+                const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
+                uint16_t gen_delta_time = static_cast<uint16_t>(time_now.count());
+                outgoing["version"] = 1.0;
+                outgoing["timestamp"] = gen_delta_time * GenerationDeltaTime_oneMilliSec;
 
-    // Wrap SPATEM object into an array
-    outgoing["objects"] = nlohmann::json::array();
+                // Wrap SPATEM object into an array
+                outgoing["objects"] = nlohmann::json::array();
 
-    // Empty events array
-    outgoing["events"] = nlohmann::json::array();
+                // Empty events array
+                outgoing["events"] = nlohmann::json::array();
 
-    // Add trafficLights manually
-    outgoing["trafficLights"] = nlohmann::json::array();
+                // Add trafficLights manually
+                outgoing["trafficLights"] = nlohmann::json::array();
 
-    // Example: populate trafficLights from SPATEM intersections
-    for (const auto& intersection : original["intersections"]) {
-        nlohmann::json trafficLightEntry;
-        trafficLightEntry["intersectionId"] = intersection["id"];
-        trafficLightEntry["states"] = nlohmann::json::array();
+                // Example: populate trafficLights from SPATEM intersections
+                for (const auto& intersection : original["intersections"]) {
+                    nlohmann::json trafficLightEntry;
+                    trafficLightEntry["intersectionId"] = intersection["id"];
+                    trafficLightEntry["states"] = nlohmann::json::array();
 
-        // Example: map movement signal groups to states
-        for (const auto& movement : intersection["movements"]) {
-            nlohmann::json state;
-            state["signalGroup"] = movement["signalGroup"];
-            // Here, map event state to some numeric state (example: take first event)
-            if (!movement["stateTimeSpeed"].empty()) {
-                state["state"] = movement["stateTimeSpeed"][0];
-            } else {
-                state["state"] = 0; // default if no event
-            }
-            trafficLightEntry["states"].push_back(state);
+                    // Example: map movement signal groups to states
+                    for (const auto& movement : intersection["movements"]) {
+                        nlohmann::json state;
+                        state["signalGroup"] = movement["signalGroup"];
+                        // Here, map event state to some numeric state (example: take first event)
+                        if (!movement["stateTimeSpeed"].empty()) {
+                            state["state"] = movement["stateTimeSpeed"][0];
+                        } else {
+                            state["state"] = 0; // default if no event
+                        }
+                        trafficLightEntry["states"].push_back(state);
+                    }
+
+                    outgoing["trafficLights"].push_back(trafficLightEntry);
+                }
+                
+                std::string jsonStr = outgoing.dump();
+                this->sendCAMToServer(jsonStr, jsonStr.size());
         }
-
-        outgoing["trafficLights"].push_back(trafficLightEntry);
-    }
-    
-    std::string jsonStr = outgoing.dump();
-    this->sendCAMToServer(jsonStr, jsonStr.size());
-    }
         
         
     }
@@ -1328,7 +1327,35 @@ void ITSApplication::sendCPM(const json& j){
             asn_obj->xAcceleration->longitudinalAccelerationValue = obj.value("longAcc", 0.0);  
             asn_obj->xAcceleration->longitudinalAccelerationConfidence = obj.value("longAccConfidence", 0);
         }
+        if(obj.contains("classID")){
+            asn_obj->classification =vanetza::asn1::allocate<ObjectClassDescription_t>();
+            if (!asn_obj->classification) return;
 
+                
+                ObjectClass_t *objClass = vanetza::asn1::allocate<ObjectClass_t>();
+                if (!objClass) return;
+
+                objClass->confidence = 90;  // example
+                int classID = obj["classID"].get<int>();
+                if(classID==0){
+                objClass->Class.present = ObjectClass__class_PR_person;
+                objClass->Class.choice.person.type = PersonSubclassType_pedestrian;
+                objClass->Class.choice.person.confidence = 100;
+                }
+                if(classID==1){
+                objClass->Class.present = ObjectClass__class_PR_person;
+                objClass->Class.choice.person.type = PersonSubclassType_personGroup;
+                objClass->Class.choice.person.confidence = 100;
+                }
+                if(classID==2){
+                objClass->Class.present = ObjectClass__class_PR_vehicle;
+                objClass->Class.choice.vehicle.type = VehicleSubclassType_passengerCar; 
+                objClass->Class.choice.vehicle.confidence = 100;
+                }
+
+                // Add to the classification list
+                ASN_SEQUENCE_ADD(&asn_obj->classification->list, objClass);
+        }
         // yawAngle 1 -> 0.1º
         if (obj.contains("heading")) {
             asn_obj->yawAngle = vanetza::asn1::allocate<CartesianAngle_t>();
