@@ -71,6 +71,11 @@
         "longitudinalaccelerationvalue.h": "c",
         "nativeenumerated.h": "c",
         "headingconfidence.h": "c",
-        "optional": "cpp"
+        "optional": "cpp",
+        "any": "cpp",
+        "codecvt": "cpp",
+        "forward_list": "cpp",
+        "ranges": "cpp",
+        "valarray": "cpp"
     }
 }

@@ -98,7 +98,7 @@ private:
     asio::ip::udp::socket cam_socket;                    // member socket
     asio::ip::udp::endpoint cam_endpoint;
 
-    std::array<char, 1024> recv_buffer;
+    std::array<char, 2048> recv_buffer;
   
 	MultihopType getMultihop();
     

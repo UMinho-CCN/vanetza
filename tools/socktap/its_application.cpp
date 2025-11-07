@@ -407,6 +407,7 @@ void ITSApplication::handle_message(std::size_t bytes_transferred){
 
     std::string data(this->recv_buffer.data(), bytes_transferred);  // Only use valid part of buffer
     try {
+        
         // Parse JSON from received data
         nlohmann::json proto2json = nlohmann::json::parse(data);
     
@@ -423,6 +424,7 @@ void ITSApplication::handle_message(std::size_t bytes_transferred){
                 // Create a JSON object with the single event
                 nlohmann::json singleEventJson; 
                 singleEventJson["events"] = event; //add event
+                std::cout << "Json Data: " << data << std::endl;
                 this->sendDenm(singleEventJson);
             }
         } else if (events.is_object()) {
@@ -686,31 +688,37 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
     if (cam) {
         std::cout << "Received CAM with decodable content" << std::endl;
         if(send_to_logFile){
-            char sender_timeStamp_str [500];
-            char sender_station_id_str [500];
             const ItsPduHeader_t& headerRef = (*cam)->header;
             const CoopAwareness_t& camRef = (*cam)->cam;
-
-            
-            int size2 = snprintf(sender_timeStamp_str, sizeof(sender_timeStamp_str), "%ld", camRef.generationDeltaTime);
-            int size3 = snprintf(sender_station_id_str, sizeof(sender_station_id_str), "%ld", headerRef.stationID);
-
-            // Print the result
-            std::cout << sender_timeStamp_str << std::endl;
-            std::cout << sender_station_id_str << std::endl;
-            // Print the result
            
-            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
+            //timestamp now, id_station, send/receive (0/1), message ID, from_station_id, gen_deltatime 
+            auto now = std::chrono::system_clock::now();
+            auto current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now.time_since_epoch()
+            ).count();
+
+            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
             uint16_t gen_delta_time = time_now.count();
-            std::string receiver_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
-            long long timestamp_ms = std::stoll(sender_timeStamp_str);  
-            std::time_t tt = timestamp_ms / 1000;
-            std::string sender_timeStampUnix_str = std::ctime(&tt);
-            if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
-            sender_timeStampUnix_str.pop_back();
-            }
-            std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("/usr/local/bin/log.txt","1,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+
+            char buffer[1000];
+
+            snprintf(buffer, sizeof(buffer), 
+                            "%ld,%d,%d,%d,%d,%ld,%ld\n", 
+                            current_timestamp,
+                            this->station_id,
+                            1,
+                            headerRef.messageID,
+                            headerRef.stationID,
+                            camRef.generationDeltaTime,
+                            gen_delta_time
+
+            );
+            
+            appendTologFile("/var/log/v2x/v2x-full.log", buffer);
+            //snprintf()
+            
+            //appendTologFile("/var/log/v2x/v2x-full.log",current_timestamp+","+ std::to_string(this->station_id) + "," + std::to_string(0) + ",CAM" + ","  + headerRef.messageID +","+ sender_station_id_str, +"," +  std::to_string(genDeltaTime_str));
+            //appendTologFile("/var/log/v2x/v2x-full.log","1,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
         }
         if (print_rx_msg_) {
             std::cout << "Received CAM contains\n";
@@ -732,12 +740,14 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             outgoing["version"] = 1.0;
             outgoing["timestamp"] = gen_delta_time * GenerationDeltaTime_oneMilliSec;
             original["classID"] = 2;
+            original["originID"] = "OBU";
 
             // Wrap the single object into an array
             outgoing["objects"] = json::array({ original });
 
             // Add empty events object
             outgoing["events"] = json::array();
+            
 
             // Serialize and send
             std::string jsonStr = outgoing.dump();
@@ -766,8 +776,24 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
             sender_timeStampUnix_str.pop_back();
             }
+
+            char buffer[1024];
+            const DENM_t* d = denm->content();
+            if(d->denm.situation->eventType.causeCode == 97){
+                snprintf(buffer, sizeof(buffer), 
+                "{\"version\":0.0,\"timestamp\":0,\"messageID\":0.0,\"objects\":[],\"events\":[{\"eventID\":1,\"eventType\":\"collisionRisk\",\"origin\":\"ITS-PLAT\",\"lat\":415616150,\"lon\":-83991518,\"altitude\":0,\"radius\":0,\"referenceTime\":0.0,\"detectionTime\":0.0,\"clusterSize\":0}],\"trafficLights\":[]}"
+                );
+            }else if(d->denm.situation->eventType.causeCode == 0){
+                snprintf(buffer, sizeof(buffer), 
+                "{\"version\":0.0,\"timestamp\":0,\"messageID\":0.0,\"objects\":[],\"events\":[{\"eventID\":1,\"eventType\":\"collisionRiskEnd\",\"origin\":\"ITS-PLAT\",\"lat\":415616150,\"lon\":-83991518,\"altitude\":0,\"radius\":0,\"referenceTime\":0.0,\"detectionTime\":0.0,\"clusterSize\":0}],\"trafficLights\":[]}"
+                );
+            }
+
+            std::string jsonStr(buffer);
+            this->sendCAMToServer(jsonStr, jsonStr.size());
+
             std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("/usr/local/bin/log.txt","1,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+            appendTologFile("/var/log/v2x/v2x-full.log","1,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
         }
         if (print_rx_DENM_) {  
             std::cout << "Received DENM contains\n";
@@ -790,6 +816,7 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
 				std::cout << "Multihop - Prob\n";
 				break;
 		}
+
     }    
     else if (cpm) {
         
@@ -812,7 +839,7 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             sender_timeStampUnix_str.pop_back();
             }
             std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("/usr/local/bin/log.txt","1,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+            appendTologFile("/var/log/v2x/v2x-full.log","1,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
         }
         if (print_rx_CPM_) {
             std::cout << "Received CPM contains\n";
@@ -840,7 +867,7 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             sender_timeStampUnix_str.pop_back();
             }
             std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("/usr/local/bin/log.txt","1,SPATEM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+            appendTologFile("/var/log/v2x/v2x-full.log","1,SPATEM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
         }
         if (print_rx_SPATEM_) {
             std::cout << "Received SPATEM contains\n";
@@ -1004,7 +1031,7 @@ void ITSApplication::on_timer(Clock::time_point)
         sender_timeStampUnix_str.pop_back();
         }
         std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("/usr/local/bin/log.txt","0,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+        appendTologFile("/var/log/v2x/v2x-full.log","0,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
     }
 }
 
@@ -1105,10 +1132,10 @@ void ITSApplication::sendDenm(const json& j){
     } else if (eventTypeStr == "SAFEZONE_INFRACION") {
         causeCode = 9;  // Hazardous location - Surface condition
         // subCauseCode remains 0 (generic)
-    } else if(eventTypeStr == "collisionRisk"){
+    } else if(eventTypeStr == "collisionRisk" || eventTypeStr == "COLLISION_RISK"){
         causeCode = 97; // Collision risk 
         subCauseCode = 4; // Collision risk involving vulnerable road user 
-    }else if(eventTypeStr == "UNKNOWN"||eventTypeStr == "collisionRiskEnd" ){ //termination code
+    }else if(eventTypeStr == "UNKNOWN"|| eventTypeStr == "collisionRiskEnd" || eventTypeStr == "COLLISION_RISK_END" ){ //termination code
         causeCode = 0;
         subCauseCode = 0;
         management.termination = (Termination_t*) calloc(1, sizeof(Termination_t));
@@ -1166,7 +1193,7 @@ void ITSApplication::sendDenm(const json& j){
         sender_timeStampUnix_str.pop_back();
         }
         std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("/usr/local/bin/log.txt","0,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+        appendTologFile("/var/log/v2x/v2x-full.log","0,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
     }
 }
 
@@ -1421,7 +1448,7 @@ void ITSApplication::sendCPM(const json& j){
         sender_timeStampUnix_str.pop_back();
         }
         std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("/usr/local/bin/log.txt","0,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+        appendTologFile("/var/log/v2x/v2x-full.log","0,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
     }
 }
 
