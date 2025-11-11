@@ -703,7 +703,7 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             char buffer[1000];
 
             snprintf(buffer, sizeof(buffer), 
-                            "%ld,%d,%d,%d,%d,%ld,%ld\n", 
+                            "%ld,%d,%d,%d,%d,%ld,%ld", 
                             current_timestamp,
                             this->station_id,
                             1,
@@ -715,10 +715,6 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             );
             
             appendTologFile("/var/log/v2x/v2x-full.log", buffer);
-            //snprintf()
-            
-            //appendTologFile("/var/log/v2x/v2x-full.log",current_timestamp+","+ std::to_string(this->station_id) + "," + std::to_string(0) + ",CAM" + ","  + headerRef.messageID +","+ sender_station_id_str, +"," +  std::to_string(genDeltaTime_str));
-            //appendTologFile("/var/log/v2x/v2x-full.log","1,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
         }
         if (print_rx_msg_) {
             std::cout << "Received CAM contains\n";
@@ -733,12 +729,13 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             // Build the outgoing message
             json outgoing;
 
+            const CoopAwareness_t& camRef = (*cam)->cam;
+
             // Add version and timestamp manually
-            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
-            uint16_t gen_delta_time = time_now.count();
+            
             // Copy version and timestamp
             outgoing["version"] = 1.0;
-            outgoing["timestamp"] = gen_delta_time * GenerationDeltaTime_oneMilliSec;
+            outgoing["timestamp"] = camRef.generationDeltaTime;
             original["classID"] = 2;
             original["originID"] = "OBU";
 
@@ -764,18 +761,10 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             const ManagementContainer_t& mgmtRef = (*denm)->denm.management;
             long referenceTimeValue = 0;
             asn_INTEGER2long(&mgmtRef.referenceTime, &referenceTimeValue);
-            int size2 = snprintf(sender_timeStamp_str, sizeof(sender_timeStamp_str), "%ld", referenceTimeValue);
-            int size3 = snprintf(sender_station_id_str, sizeof(sender_station_id_str), "%ld", headerRef.stationID);
-            std::cout << sender_timeStamp_str<< std::endl; 
-            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
-            uint16_t gen_delta_time = time_now.count();
-            std::string receiver_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
-            long long timestamp_ms = std::stoll(sender_timeStamp_str);  
-            std::time_t tt = timestamp_ms / 1000;
-            std::string sender_timeStampUnix_str = std::ctime(&tt);
-            if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
-            sender_timeStampUnix_str.pop_back();
-            }
+
+            long detectionTimeValue = 0;
+            asn_INTEGER2long(&mgmtRef.detectionTime, &detectionTimeValue);
+            
 
             char buffer[1024];
             const DENM_t* d = denm->content();
@@ -792,8 +781,30 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             std::string jsonStr(buffer);
             this->sendCAMToServer(jsonStr, jsonStr.size());
 
-            std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("/var/log/v2x/v2x-full.log","1,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+            auto now = std::chrono::system_clock::now();
+            auto current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now.time_since_epoch()
+            ).count();
+          
+            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
+            uint16_t gen_delta_time = time_now.count();
+            char bufferLog[1000];
+
+            snprintf(bufferLog, sizeof(buffer), 
+                            "%ld,%d,%d,%d,%d,%ld,%ld,%ld", 
+                            current_timestamp,
+                            this->station_id,
+                            1,
+                            headerRef.messageID,
+                            headerRef.stationID,
+                            referenceTimeValue,
+                            detectionTimeValue,
+                            gen_delta_time
+
+
+            );
+            
+            appendTologFile("/var/log/v2x/v2x-full.log", bufferLog);
         }
         if (print_rx_DENM_) {  
             std::cout << "Received DENM contains\n";
@@ -826,20 +837,30 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             char sender_station_id_str [500];
             const ItsPduHeader_t& headerRef = (*cpm)->header;
             const CollectivePerceptionMessage_t& cpmRef = (*cpm)->cpm;
-            int size2 = snprintf(sender_timeStamp_str, sizeof(sender_timeStamp_str), "%ld", cpmRef.generationDeltaTime);
-            int size3 = snprintf(sender_station_id_str, sizeof(sender_station_id_str), "%ld", headerRef.stationID);
             
-           const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
+
+            auto now = std::chrono::system_clock::now();
+            auto current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now.time_since_epoch()
+            ).count();
+          
+            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
             uint16_t gen_delta_time = time_now.count();
-            std::string receiver_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
-            long long timestamp_ms = std::stoll(sender_timeStamp_str);  
-            std::time_t tt = timestamp_ms / 1000;
-            std::string sender_timeStampUnix_str = std::ctime(&tt);
-            if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
-            sender_timeStampUnix_str.pop_back();
-            }
-            std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("/var/log/v2x/v2x-full.log","1,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+            char bufferLog[1000];
+
+            snprintf(bufferLog, sizeof(bufferLog), 
+                            "%ld,%d,%d,%d,%d,%ld,%ld", 
+                            current_timestamp,
+                            this->station_id,
+                            1,
+                            headerRef.messageID,
+                            headerRef.stationID,
+                            cpmRef.generationDeltaTime,
+                            gen_delta_time
+
+            );
+            
+            appendTologFile("/var/log/v2x/v2x-full.log", bufferLog);
         }
         if (print_rx_CPM_) {
             std::cout << "Received CPM contains\n";
@@ -854,20 +875,29 @@ void ITSApplication::indicate(const DataIndication& indication, UpPacketPtr pack
             char sender_station_id_str [500];
             const ItsPduHeader_t& headerRef = (*spatem)->header;
             const  SPAT_t& spatemRef = (*spatem)->spat;
-            int size = sprintf(sender_timeStamp_str, "%ld", *spatemRef.timeStamp);
-            int size3 = snprintf(sender_station_id_str, sizeof(sender_station_id_str), "%ld", headerRef.stationID);
-           
-            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());   
-            uint16_t gen_delta_time = static_cast<uint16_t>(time_now.count() % 65536);
-            std::string receiver_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
-            long long timestamp_ms = std::stoll(sender_timeStamp_str);  
-            std::time_t tt = timestamp_ms / 1000;
-            std::string sender_timeStampUnix_str = std::ctime(&tt);
-            if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
-            sender_timeStampUnix_str.pop_back();
-            }
-            std::string receiver_station_id_str = std::to_string(this->station_id);
-            appendTologFile("/var/log/v2x/v2x-full.log","1,SPATEM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timeStamp_str+","+receiver_station_id_str+","+receiver_timestamp_str);
+            
+            auto now = std::chrono::system_clock::now();
+            auto current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now.time_since_epoch()
+            ).count();
+          
+            const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
+            uint16_t gen_delta_time = time_now.count();
+            char bufferLog[1000];
+
+            snprintf(bufferLog, sizeof(bufferLog), 
+                            "%ld,%d,%d,%d,%d,%ld,%ld", 
+                            current_timestamp,
+                            this->station_id,
+                            1,
+                            headerRef.messageID,
+                            headerRef.stationID,
+                            0,//sem timestamp, tem apenas em minutos
+                            gen_delta_time
+
+            );
+            
+            appendTologFile("/var/log/v2x/v2x-full.log", bufferLog);
         }
         if (print_rx_SPATEM_) {
             std::cout << "Received SPATEM contains\n";
@@ -1024,14 +1054,28 @@ void ITSApplication::on_timer(Clock::time_point)
     }
 
     if(send_to_logFile){
-        std::string sender_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
-        std::time_t tt = (gen_delta_time * GenerationDeltaTime_oneMilliSec) / 1000;
-        std::string sender_timeStampUnix_str = std::ctime(&tt);
-        if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
-        sender_timeStampUnix_str.pop_back();
-        }
-        std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("/var/log/v2x/v2x-full.log","0,CAM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+        
+        auto now = std::chrono::system_clock::now();
+        auto current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()
+        ).count();
+
+        const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
+        uint16_t gen_delta_time = time_now.count();
+
+        char buffer[1000];
+
+        snprintf(buffer, sizeof(buffer), 
+                        "%ld,%d,%d,%d,%ld", 
+                        current_timestamp,
+                        this->station_id,
+                        0,
+                        ItsPduHeader__messageID_cam,
+                        cam.generationDeltaTime
+
+        );
+        
+        appendTologFile("/var/log/v2x/v2x-full.log", buffer);
     }
 }
 
@@ -1167,6 +1211,16 @@ void ITSApplication::sendDenm(const json& j){
 	{
 		std::cout << "Sending DEMN using GeoBroadcasting" << std::endl;
 		// ... código específico para geo
+        
+        request.transport_type = geonet::TransportType::GBC;
+        vanetza::geonet::Area area;
+	    using vanetza::units::degree;
+	    area.shape = vanetza::geonet::Circle();
+	    boost::get<vanetza::geonet::Circle>(area.shape).r = 1000.0 * vanetza::units::si::meter;
+	    area.position.longitude = vanetza::units::GeoAngle{41.56149498741966 * degree};
+	    area.position.latitude = vanetza::units::GeoAngle{-8.399568733320859 * degree};
+	    request.destination = area;
+        
 	}
 	else
 	{
@@ -1185,15 +1239,26 @@ void ITSApplication::sendDenm(const json& j){
 
     }
      if(send_to_logFile){
+        auto now = std::chrono::system_clock::now();
+        auto current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()
+        ).count();
+
+        const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
         uint16_t gen_delta_time = time_now.count();
-        std::string sender_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
-        std::time_t tt = (gen_delta_time * GenerationDeltaTime_oneMilliSec) / 1000;
-        std::string sender_timeStampUnix_str = std::ctime(&tt);
-        if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
-        sender_timeStampUnix_str.pop_back();
-        }
-        std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("/var/log/v2x/v2x-full.log","0,DENM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+
+        char buffer[1000];
+
+        snprintf(buffer, sizeof(buffer), 
+                        "%ld,%d,%d,%d,%ld", 
+                        current_timestamp,
+                        this->station_id,
+                        0,
+                        ItsPduHeader__messageID_denm,
+                        timeValue * GenerationDeltaTime_oneMilliSec
+        );
+        
+        appendTologFile("/var/log/v2x/v2x-full.log", buffer);
     }
 }
 
@@ -1441,14 +1506,27 @@ void ITSApplication::sendCPM(const json& j){
         std::cout << "-- Vanetza UPER Encoding Error --\nCheck that the message format follows ETSI spec\n" << e.what() << std::endl;        
     }
     if(send_to_logFile){
-        std::string sender_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
-        std::time_t tt = (gen_delta_time * GenerationDeltaTime_oneMilliSec) / 1000;
-        std::string sender_timeStampUnix_str = std::ctime(&tt);
-        if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
-        sender_timeStampUnix_str.pop_back();
-        }
-        std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("/var/log/v2x/v2x-full.log","0,CPM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+        auto now = std::chrono::system_clock::now();
+        auto current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()
+        ).count();
+
+        const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
+        uint16_t gen_delta_time = time_now.count();
+
+        char buffer[1000];
+
+        snprintf(buffer, sizeof(buffer), 
+                        "%ld,%d,%d,%d,%ld", 
+                        current_timestamp,
+                        this->station_id,
+                        0,
+                        14,
+                        cpm.generationDeltaTime
+
+        );
+        
+        appendTologFile("/var/log/v2x/v2x-full.log", buffer);
     }
 }
 
@@ -1518,13 +1596,25 @@ void ITSApplication::sendSpatem(const json& j){
 
     }
     if(send_to_logFile){
-        std::string sender_timestamp_str = std::to_string(gen_delta_time * GenerationDeltaTime_oneMilliSec);
-        std::time_t tt = (gen_delta_time * GenerationDeltaTime_oneMilliSec) / 1000;
-        std::string sender_timeStampUnix_str = std::ctime(&tt);
-        if (!sender_timeStampUnix_str.empty() && sender_timeStampUnix_str.back() == '\n') {
-        sender_timeStampUnix_str.pop_back();
-        }
-        std::string sender_station_id_str = std::to_string(this->station_id);
-        appendTologFile("/usr/local/bin/txt","0,SPATEM,"+sender_timeStampUnix_str+","+sender_station_id_str+","+sender_timestamp_str);
+        auto now = std::chrono::system_clock::now();
+        auto current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()
+        ).count();
+
+        const auto time_now = duration_cast<milliseconds>(runtime_.now().time_since_epoch());
+        uint16_t gen_delta_time = time_now.count();
+
+        char buffer[1000];
+
+        snprintf(buffer, sizeof(buffer), 
+                        "%ld,%d,%d,%d", 
+                        current_timestamp,
+                        this->station_id,
+                        0,
+                        ItsPduHeader__messageID_spatem
+
+        );
+        
+        appendTologFile("/var/log/v2x/v2x-full.log", buffer);
     }
 }
